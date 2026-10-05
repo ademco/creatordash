@@ -259,3 +259,35 @@ There are 8 new API tests (the BigQuery source tested with a fake query runner, 
 
 3. **How do you keep the BigQuery queries safe and cheap?**
    Safe: values go in as typed query parameters (`@since` as a `DATE`), never by building SQL strings from input. Table names, which can't be parameters, are checked against a strict pattern. Cheap: BigQuery bills by bytes scanned (10 MB minimum per query) with 1 TB a month free, the tables are tiny, and the API caches results for 5 minutes and merges duplicate in-flight queries. With large tables, I'd partition `audience` by `date`, so `WHERE date >= @since` only scans the partitions it needs.
+
+## Phase 7: CI
+
+### What was built
+
+`.github/workflows/ci.yml` runs on every push and pull request, with three jobs that run in parallel:
+
+| Job | What it checks |
+|---|---|
+| **Typecheck, test, build** | `npm ci` (fails if `package.json` and the lockfile disagree), `npm run typecheck`, `npm test` (Vitest for api/ and web/, plus the Python `unittest` suite), `npm run build` |
+| **Terraform format and validate** | `terraform fmt -check`, then `terraform init -backend=false` and `terraform validate`. This sandbox couldn't reach the Terraform registry, so these checks run for the first time here |
+| **Docker image builds** | `docker build --platform linux/amd64`, so the Dockerfile can't silently break. Nothing is pushed |
+
+Before committing, I ran the app job's commands in a fresh clone of the branch. That catches anything that only works because of leftover local files, such as a git-ignored file the build quietly depends on.
+
+### Key decisions and trade-offs
+
+- **CI checks, it doesn't deploy.** Deploying from CI would mean storing Google Cloud credentials in GitHub, ideally through Workload Identity Federation so no long-lived key exists. That's a good next step, but deploys stay a deliberate `scripts/deploy.sh` for now, while billing is new.
+- **Read-only token and cancel-on-push.** `permissions: contents: read` gives the workflow's token the minimum it needs. `concurrency` cancels a run when a newer commit arrives on the same branch.
+- **`node-version-file: .nvmrc`** keeps CI on the same Node version as local development, from one source of truth.
+- **The Docker job costs about a minute per push.** That's worth it, because the Dockerfile is otherwise only exercised at deploy time, which is the worst moment to find it broken.
+
+### Interview questions
+
+1. **What does your CI pipeline check, and why those things?**
+   Types, tests, and the production build for both packages; Python tests for the ingest scripts; Terraform formatting and validity; and that the Docker image builds. Together that's everything that could break a deploy, checked on every pull request, so `main` stays deployable. I also used `npm ci` instead of `npm install`, so a lockfile out of sync with `package.json` fails loudly.
+
+2. **Why `npm ci` in CI instead of `npm install`?**
+   `npm ci` installs exactly what `package-lock.json` says, deletes any existing `node_modules` first, and never changes the lockfile. If the lockfile doesn't match `package.json`, it fails instead of quietly resolving new versions. That makes CI reproducible: the versions tested are the versions that ship.
+
+3. **How would you add continuous deployment safely?**
+   Add a deploy job that runs only on pushes to `main` after the checks pass. Authenticate to Google Cloud with Workload Identity Federation: GitHub's OIDC token is exchanged for short-lived credentials, so no service account key is stored as a secret. Give that deploy identity only the roles it needs (push to Artifact Registry, deploy Cloud Run, apply Terraform), and keep Terraform state in a shared GCS bucket so CI and laptops see the same state.
