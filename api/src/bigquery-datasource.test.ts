@@ -1,3 +1,4 @@
+import { BigQuery } from '@google-cloud/bigquery';
 import { describe, expect, it } from 'vitest';
 
 import { BigQueryDataSource, type RunQuery } from './bigquery-datasource.js';
@@ -5,9 +6,9 @@ import { BigQueryDataSource, type RunQuery } from './bigquery-datasource.js';
 // A fake query runner records every call and returns canned rows, so the SQL
 // and the row mapping are tested without a Google Cloud project.
 function fakeRunner(rows: Record<string, unknown>[]) {
-  const calls: { sql: string; params?: Record<string, string>; types?: Record<string, string> }[] = [];
-  const run: RunQuery = async (sql, params, types) => {
-    calls.push({ sql, params, types });
+  const calls: { sql: string; params?: Record<string, string> }[] = [];
+  const run: RunQuery = async (sql, params) => {
+    calls.push({ sql, params });
     return rows;
   };
   return { run, calls };
@@ -24,9 +25,8 @@ describe('BigQueryDataSource', () => {
       { date: '2026-09-30', platform: 'tiktok', audience: 21666 },
     ]);
     expect(calls[0]!.sql).toContain('FROM `my-project.fan_insights.audience`');
-    expect(calls[0]!.sql).toContain('WHERE date >= @since');
+    expect(calls[0]!.sql).toContain('WHERE date >= CAST(@since AS DATE)');
     expect(calls[0]!.params).toEqual({ since: '2026-09-01' });
-    expect(calls[0]!.types).toEqual({ since: 'DATE' });
   });
 
   it('maps snake_case content columns to camelCase fields', async () => {
@@ -37,7 +37,7 @@ describe('BigQueryDataSource', () => {
     expect(await source.contentSince('2026-07-03')).toEqual([
       { publishedDate: '2026-09-15', platform: 'tiktok', contentType: 'short', title: 'Fan duet', views: 48055 },
     ]);
-    expect(calls[0]!.sql).toContain('WHERE published_date >= @since');
+    expect(calls[0]!.sql).toContain('WHERE published_date >= CAST(@since AS DATE)');
   });
 
   it('finds the newest date across both tables, or null when empty', async () => {
@@ -54,6 +54,14 @@ describe('BigQueryDataSource', () => {
       sample: true,
       newestDate: '2026-09-30',
     });
+  });
+
+  // The fake runner above skips the client library, which is how a dropped
+  // parameter once reached production. This runs the library's own step that
+  // turns a parameter into what BigQuery receives, and checks the date survives.
+  it('sends the date parameter with its value through the real client library', () => {
+    const sent = BigQuery.valueToQueryParameter_('2026-07-03');
+    expect(sent).toEqual({ parameterType: { type: 'STRING' }, parameterValue: { value: '2026-07-03' } });
   });
 
   it('refuses table names that could inject SQL', () => {

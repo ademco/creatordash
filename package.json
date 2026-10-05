@@ -19,7 +19,8 @@
     "sample-data": "node scripts/generate-sample-data.mjs",
     "check-data": "python3 ingest/fan_data.py check",
     "docker:build": "docker buildx build --platform linux/amd64 -t fan-insights:local --load .",
-    "docker:run": "docker run --rm -p 8080:8080 fan-insights:local"
+    "docker:run": "docker run --rm -p 8080:8080 fan-insights:local",
+    "load-bq": "bash scripts/load-bq.sh"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
