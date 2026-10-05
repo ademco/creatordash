@@ -69,6 +69,13 @@ It prints the URL at the end. The first deploy takes a few minutes, mostly enabl
 python3 ingest/load_to_bigquery.py --project YOUR_PROJECT_ID --data data/sample
 ```
 
+No working Python? This does the same with only `gcloud` and `bq`, then counts the rows and waits until the live page shows the numbers:
+
+```bash
+npm run load-bq -- YOUR_PROJECT_ID              # sample data
+npm run load-bq -- YOUR_PROJECT_ID data/real    # your real numbers
+```
+
 Refresh the URL. The page now reads from BigQuery: the footer says "from BigQuery dataset ...". To show your real numbers instead, load them and redeploy with the sample-data note turned off:
 
 ```bash
