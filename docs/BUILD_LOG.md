@@ -106,3 +106,40 @@ Run it with `npm run dev -w api` and open http://localhost:4000/graphql for Apol
 
 3. **What's a pure function, and why does it matter here?**
    Its output depends only on its inputs, and it has no side effects: no file reads, no clock, no network. Every insight rule is pure, so each test just passes in rows and checks the result. There's no mocking, and the tests run in milliseconds. For example, windows count back from the newest date in the data, not from `Date.now()`, so the same input always gives the same answer.
+
+## Phase 3: Dashboard
+
+### What was built
+
+A React 19 + TypeScript dashboard in `web/`, built with Vite 8. `npm run dev` at the root starts the API and the dashboard together (using `concurrently`), and Vite proxies `/graphql` to the API on port 4000.
+
+- **One GraphQL query** (`web/src/graphql/dashboard.ts`) fetches everything the page shows for the chosen window. `TypedDocumentNode` gives the result a TypeScript type, so `data.overview.gained` is checked by the compiler.
+- **Top bar:** app name, plus a 30 / 90 / 180-day picker. It's a real radio group, so it works with the keyboard and screen readers. The choice is kept in the URL (`?days=90`).
+- **Headline:** a sentence written from the data by `lib/summary.ts`. It says "Most of them came from TikTok" only when that platform really brought more than half. Otherwise it says "Spotify brought the most". It also handles drops and no change. A second line gives the combined audience and says someone following on two platforms counts twice.
+- **Growth chart:** a Recharts line chart with a Growth/Total toggle and platform chips that show or hide each line. The tooltip lists every visible platform at the hovered date. A "See these numbers as a table" section gives the same numbers without the chart.
+- **Where your fans are:** thin share bars with the latest audience (in each platform's own word: monthly listeners, subscribers, followers), the share, and the gain.
+- **What broke out:** a ranked list with the multiple ("7.1×"), title, platform, date, and "48,055 views, usually 6,762". Streams say "peak viewers" and releases say "streams".
+- **States:** loading, empty (points to the docs and to `npm run sample-data`), and error (says to run `npm run dev`, with a Try again button). When you switch windows, the old numbers stay on screen, dimmed, until the new ones arrive, so nothing flashes or jumps.
+
+There are 10 Vitest tests for the headline wording, the number formatting, and the axis ticks. I checked it in headless Chromium at 1280px in light and dark mode and at 390px (phone), with no horizontal scrolling. I also checked hover, toggles, the window switch, keyboard focus, and the error state with the API stopped.
+
+### Key decisions and trade-offs
+
+- **The palette was checked, not eyeballed.** I ran the spec colors through a colorblind-safety validator. Two needed small nudges: Spotify green `#1F7A5A` → `#0F8A5F` (it read as gray) and Kick gold `#B58A00` → `#A47C00` (below 3:1 contrast on the paper background). The dark theme has its own tuned set, checked against the dark background. Colors are CSS variables. The SVG chart reads them in JS (`useThemeColors`) and re-reads them when the system theme changes.
+- **"Growth" is the default view.** TikTok (21K) and Kick (1.6K) on one "Total" axis makes Kick a flat line. Gain since the start of the window puts every platform on a comparable scale, and it's what an artist actually asks: who grew?
+- **Chips are the legend.** Each chip has the line's color, and colors follow the platform, never its rank, so hiding a line never repaints the others.
+- **I calculate the axis ticks myself.** Recharts rounded the axis down to a full tick, so a −50 dip added an empty band down to −2,000. `lib/ticks.ts` ends the axis at the data and puts ticks at round numbers inside it.
+- **No chart for the share bars.** They're plain HTML `div`s, which are simpler, accessible, and easy to style. The text carries the value, and the bar is marked `aria-hidden`.
+- **Dates are formatted in UTC.** `2026-09-30` means a calendar day. Formatting it in local time would show "Sep 29" to anyone west of London.
+- **One bundle, about 230 KB gzipped.** Code-splitting wouldn't help much, because the page always needs Recharts and Apollo, so I raised Vite's warning limit with a comment explaining why.
+
+### Interview questions
+
+1. **How does the dashboard get its data, and why is there no CORS setup?**
+   The page sends one GraphQL query to the relative URL `/graphql`. In development, Vite's dev server proxies that path to the API on port 4000. In production, the same Express server serves the page and `/graphql`. Either way the browser only ever talks to one origin, so CORS never comes up. Apollo Client caches results by query and variables, so switching back to a window you've already seen is instant.
+
+2. **How did you make the chart work in dark mode and for colorblind users?**
+   Colors are defined once as CSS variables, with a dark-mode override under `prefers-color-scheme`. The chart is SVG, so a hook reads the current variable values and re-reads them when the theme changes. I validated both palettes for lightness, contrast against the background, and separation under simulated color blindness, and adjusted two colors. Identity never relies on color alone: chips and the tooltip pair color with the platform name, and there's a table view.
+
+3. **Why keep the previous data on screen while loading?**
+   If the page swapped to a spinner on every window change, the layout would collapse and jump back, and you'd lose your place. Apollo's `previousData` lets the page keep the last result, dimmed, until the new one arrives. It's a small detail that makes the page feel stable.

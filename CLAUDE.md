@@ -124,7 +124,7 @@ Stretch ideas, only if Adem asks: an A&R view comparing several artists (check w
 
 ## Commands (fill in as they are created)
 
-- `npm run dev`: API and dashboard together
+- `npm run dev`: API (http://localhost:4000/graphql) and dashboard (http://localhost:5173) together
 - `npm test`: unit tests
 - `npm run typecheck`
 - `npm run build`

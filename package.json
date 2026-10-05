@@ -11,9 +11,13 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "concurrently --names api,web --prefix-colors blue,magenta \"npm run dev -w api\" \"npm run dev -w web\"",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "sample-data": "node scripts/generate-sample-data.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }
