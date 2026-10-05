@@ -116,6 +116,12 @@ Each phase ends with passing checks, a commit, and a BUILD_LOG entry.
 
 Stretch ideas, only if Adem asks: an A&R view comparing several artists (check what the Spotify Web API currently allows before planning it), a release-impact view (audience change in the 7 days after each release), a scheduled job that refreshes data daily.
 
+## Git workflow
+
+- `main` is the default branch and always passes typecheck, tests, and build.
+- Each phase is built on a feature branch and lands in `main` as one pull request titled `phase N: ...`. The description summarizes the phase and points to its BUILD_LOG section.
+- Adem reviews and merges each PR with "Squash and merge", so `main` reads as one commit per phase.
+
 ## Commands (fill in as they are created)
 
 - `npm run dev`: API and dashboard together
