@@ -1,0 +1,18 @@
+{
+  "name": "fan-insights-lite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fan insights dashboard for an independent artist: audience growth, where fans are, and what broke out.",
+  "workspaces": [
+    "api",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  }
+}

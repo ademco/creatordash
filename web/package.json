@@ -1,0 +1,6 @@
+{
+  "name": "@fan-insights/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React dashboard (Vite + Apollo Client). Filled in during Phase 3."
+}

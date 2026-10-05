@@ -1,0 +1,30 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+
+# Real analytics data stays on your machine (Phase 4). Sample data is committed.
+data/real/
+
+# Terraform: state can hold secrets, and the provider cache is large (Phase 6)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Python ingest script (Phase 6)
+__pycache__/
+.venv/
+
+# Logs and OS noise
+*.log
+.DS_Store

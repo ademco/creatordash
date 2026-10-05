@@ -1,0 +1,6 @@
+{
+  "name": "@fan-insights/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GraphQL API (Express + Apollo Server). Filled in during Phase 2."
+}
