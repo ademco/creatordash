@@ -143,3 +143,41 @@ There are 10 Vitest tests for the headline wording, the number formatting, and t
 
 3. **Why keep the previous data on screen while loading?**
    If the page swapped to a spinner on every window change, the layout would collapse and jump back, and you'd lose your place. Apollo's `previousData` lets the page keep the last result, dimmed, until the new one arrives. It's a small detail that makes the page feel stable.
+
+## Phase 4: Real data
+
+### What was built
+
+- **`docs/REAL_DATA.md`**: how to get numbers from Spotify for Artists, YouTube Studio, Twitch, Kick, and TikTok into the two CSV files. It also explains why views must be measured over the same period to be comparable.
+- **`data/templates/`**: ready-to-copy `audience.csv` and `content.csv` with example rows, including a quoted title with commas.
+- **`ingest/fan_data.py`**: the adapter for existing Python scripts. It uses only the standard library.
+  - `check_folder("data/real")` lists every problem with its line number.
+  - `upsert_audience` and `upsert_content` add or replace rows: audience rows keyed by date and platform, content rows by date, platform, and title. Re-running a daily script updates numbers instead of duplicating them.
+  - Command-line equivalents: `check`, `add-audience`, `add-content`.
+- **New commands:**
+  - `npm run dev:real`: the dashboard on `data/real`
+  - `npm run check-data -- data/real`: check a folder without starting anything
+  - `npm test` now also runs the Python tests
+- **A clear startup error** when the data folder is missing ("Can't find data/real/audience.csv. Copy the templates there...") instead of a raw file-not-found error.
+
+Tests: 6 Python `unittest` tests, plus 3 new API tests. One of them loads `data/templates` through the real `LocalDataSource`, so if the documented format and the API ever disagree, the build fails.
+
+**Still open:** I didn't have access to Adem's existing analytics scripts. Once they're in the repo, or I know what they output, the next step is a small script that calls `upsert_audience` and `upsert_content` with their output.
+
+### Key decisions and trade-offs
+
+- **A documented CSV format, not one adapter per platform export.** Export formats change without notice, and some platforms (Spotify for Artists, Kick) have no public API for these numbers. One small, strictly checked format that any script or spreadsheet can produce is more durable than five parsers for formats I can't test.
+- **Validation in two languages.** The rules exist in TypeScript (`api/src/rows.ts`) and Python (`ingest/fan_data.py`). That's duplication, but each side is about 30 lines, and the cross-check test above catches drift. The alternative, a JSON Schema shared by both, is more machinery than two files need.
+- **Upsert instead of append.** Scripts get re-run, and an append-only file would double-count. A natural key (date + platform) makes re-runs safe. This idea is called idempotency.
+- **Real data stays local.** `data/real/` was in `.gitignore` from Phase 0, and the docs say so up front.
+
+### Interview questions
+
+1. **How would you get data from five platforms into one model when some of them have no API?**
+   I'd define one small, strict format (date, platform, number) and make everything produce it: API scripts where APIs exist, manual exports where they don't. A validator with line-numbered errors turns a messy manual process into a reliable one. The dashboard doesn't care where a row came from. In production, each source would be its own ingestion job writing to the same tables.
+
+2. **What does "idempotent" mean, and where did you use it?**
+   Doing the same operation twice has the same effect as doing it once. `upsert_audience` replaces the row for a date and platform instead of appending, so a daily script that runs twice, or a backfill that overlaps old data, can't double-count followers. In BigQuery the same idea is a `MERGE` statement on the natural key.
+
+3. **You validate the same rules in Python and TypeScript. Isn't that a problem?**
+   It's a known trade-off. The two validators are tiny and protect different entry points: Python checks before data is written or uploaded, and TypeScript checks what the API actually loads. To stop them drifting, a test loads the documented template files through the API's loader, and the Python tests check the same files. With a bigger schema, I'd generate both from one JSON Schema.

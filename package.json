@@ -12,10 +12,12 @@
   },
   "scripts": {
     "dev": "concurrently --names api,web --prefix-colors blue,magenta \"npm run dev -w api\" \"npm run dev -w web\"",
+    "dev:real": "DATA_DIR=data/real npm run dev",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && python3 -m unittest discover -s ingest",
     "build": "npm run build --workspaces --if-present",
-    "sample-data": "node scripts/generate-sample-data.mjs"
+    "sample-data": "node scripts/generate-sample-data.mjs",
+    "check-data": "python3 ingest/fan_data.py check"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

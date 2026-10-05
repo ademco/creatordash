@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import type { DataSource } from './datasource.js';
@@ -29,6 +29,14 @@ export class LocalDataSource implements DataSource {
   private load(): Loaded {
     const audiencePath = join(this.dir, 'audience.csv');
     const contentPath = join(this.dir, 'content.csv');
+    for (const path of [audiencePath, contentPath]) {
+      if (!existsSync(path)) {
+        throw new Error(
+          `Can't find ${path}. Copy the templates there (cp data/templates/*.csv ${relative(this.repoRoot, this.dir)}/) ` +
+            'and see docs/REAL_DATA.md.',
+        );
+      }
+    }
     const mtimes = `${statSync(audiencePath).mtimeMs}:${statSync(contentPath).mtimeMs}`;
     if (this.loaded?.mtimes === mtimes) return this.loaded;
 
