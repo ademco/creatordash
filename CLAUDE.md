@@ -129,3 +129,4 @@ Stretch ideas, only if Adem asks: an A&R view comparing several artists (check w
 - `npm run typecheck`
 - `npm run build`
 - `npm run sample-data`: regenerate the made-up data in `data/sample/`
+- `npm run dev -w api`: API only, at http://localhost:4000/graphql (Apollo Sandbox)

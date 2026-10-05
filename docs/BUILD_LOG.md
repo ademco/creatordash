@@ -61,3 +61,48 @@ Tool check: Node 22.22.0, npm 10.9.4, git 2.43.0. Nothing needed installing. The
 
 3. **Why is the median better than the mean for "usual views"?**
    One big hit drags the mean up but barely moves the median, and the hit is part of its own baseline. The sample data shows this. Spotify has 5 releases in the last 90 days. "Glass Houses" has 45,546 streams; the median is 14,403 and the mean is 19,677. Measured against the median it's 3.16×, a clear breakout. Measured against the mean it's 2.31×, so the most important release of the quarter would disappear from the list. The fewer items a platform has, the worse this gets, which is also why platforms with under 3 items are skipped.
+
+## Phase 2: API
+
+### What was built
+
+A TypeScript GraphQL API in `api/`, organized in small files with one job each:
+
+| File | Job |
+|---|---|
+| `types.ts` | The row and result shapes, plus the allowed platforms and content types |
+| `csv.ts` | A hand-written RFC 4180 CSV parser: quoted commas, doubled quotes, newlines in quotes, Windows line endings, Excel's byte-order mark |
+| `rows.ts` | Turns CSV into typed rows and reports every bad line at once ("line 14: platform "myspace" should be one of ...") |
+| `insights.ts` | The pure insight functions: `clampDays`, `windowStart`, `median`, `audienceSeries`, `platformBreakdown`, `overview`, `findBreakouts` |
+| `datasource.ts` | The `DataSource` interface: `newestDate`, `audienceSince`, `contentSince`, `info` |
+| `local-datasource.ts` | Reads the two CSVs and re-reads them when they change on disk |
+| `schema.ts` / `resolvers.ts` | GraphQL schema with descriptions on every type and field, and thin resolvers |
+| `app.ts` / `index.ts` / `config.ts` | Express 5 app (`/graphql`, `/healthz`), the entry point, and env-based configuration |
+
+There are 43 Vitest tests in 4 files. They cover the parser, the validation, every insight rule (including the median-versus-mean case), and an end-to-end test. That test starts the real Express app on a random port, sends GraphQL over HTTP, and checks the exact numbers documented for the sample data (for example, 90 days: +11,041 fans, Spotify on top, 5 breakouts).
+
+Run it with `npm run dev -w api` and open http://localhost:4000/graphql for Apollo Sandbox.
+
+### Key decisions and trade-offs
+
+- **graphql 16, not 17.** `npm view` showed graphql 17 is out, but Apollo Server 5 declares `graphql@^16.11` as a peer dependency. A mismatched peer is how you get two copies of graphql-js and confusing runtime errors, so the API pins 16.14.
+- **TypeScript 7.** It's the current release: the compiler rewritten in Go, about 10× faster. The config uses `module: NodeNext`, which follows Node's real ESM rules. That's why imports say `./csv.js` even in `.ts` files: the import names the file that will exist at runtime.
+- **Data sources only filter by date; insights.ts does the thinking.** The "what is a breakout" logic is written and tested once. The BigQuery version (Phase 6) only needs a `WHERE date >= @since` query. The trade-off is that BigQuery returns more rows than strictly needed, which doesn't matter at a few thousand rows.
+- **One shared "newest date" for both tables.** "The last 30 days" means the same days for growth and for breakouts, even if the newest content is a day older than the newest audience number.
+- **A window of N days holds N dates, including the newest.** `windowStart('2026-09-30', 30)` is `2026-09-01`. It's simple to explain, and the tests lock it in, including leap years.
+- **Hand-written CSV parser instead of a library.** The spec requires handling quoted fields, and writing the parser in about 40 lines (with tests) is a good thing to be able to explain. In a team codebase, I'd probably use `csv-parse`.
+- **Friendly validation.** Real exports will have typos. Platform names are trimmed and lowercased (`" Spotify "` works), and errors list up to 10 problems with line numbers instead of stopping at the first one.
+- **`/healthz` doesn't touch the data.** It's a liveness check. If it queried BigQuery, a slow query could make Cloud Run think the container was dead and restart it.
+- **Introspection stays on in production.** The data is read-only and the schema is the documentation. Apollo turns it off by default when `NODE_ENV=production`.
+- **No codegen yet.** Resolver argument types are written by hand because there are only five queries. With a bigger schema, I'd add GraphQL Code Generator so the TypeScript types come from the schema.
+
+### Interview questions
+
+1. **Why GraphQL instead of REST for this dashboard?**
+   The dashboard needs four different views of the data in one screen. With GraphQL it asks for exactly those fields in one request, and the schema doubles as typed, self-describing documentation (Sandbox shows every field's description). REST would mean four endpoints or one custom endpoint shaped for this page. The costs of GraphQL are caching (everything is a POST to one URL) and the risk of expensive queries. Neither matters here: the schema is flat, and the data is small and read-only.
+
+2. **How would you swap CSV files for a database without rewriting the app?**
+   That's what the `DataSource` interface is for. Resolvers depend on the interface, not on a class. `LocalDataSource` and `BigQueryDataSource` both implement four methods, and `config.ts` picks one from `DATA_SOURCE`. The insight functions are pure and only see rows, so they don't change at all. The tests prove the API behaves correctly on the local source, and the BigQuery source only has to return the same rows.
+
+3. **What's a pure function, and why does it matter here?**
+   Its output depends only on its inputs, and it has no side effects: no file reads, no clock, no network. Every insight rule is pure, so each test just passes in rows and checks the result. There's no mocking, and the tests run in milliseconds. For example, windows count back from the newest date in the data, not from `Date.now()`, so the same input always gives the same answer.
