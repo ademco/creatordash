@@ -291,3 +291,34 @@ Before committing, I ran the app job's commands in a fresh clone of the branch. 
 
 3. **How would you add continuous deployment safely?**
    Add a deploy job that runs only on pushes to `main` after the checks pass. Authenticate to Google Cloud with Workload Identity Federation: GitHub's OIDC token is exchanged for short-lived credentials, so no service account key is stored as a secret. Give that deploy identity only the roles it needs (push to Artifact Registry, deploy Cloud Run, apply Terraform), and keep Terraform state in a shared GCS bucket so CI and laptops see the same state.
+
+## Phase 8: Polish, and the 60-second story
+
+### What was built
+
+- **`README.md`**: what the project is, a screenshot, a Mermaid architecture diagram, the stack, how to run it, a repository tour, and "What I would build next". The live URL appears there once `scripts/deploy.sh` has run.
+- **`docs/screenshot.png` and `docs/screenshot-dark.png`**: taken in headless Chromium from the running app on sample data.
+- **A CI badge** in the README.
+
+The first CI run on GitHub passed all three jobs, including `terraform fmt -check` and `terraform validate`, which couldn't run in the build sandbox.
+
+### The project in 60 seconds
+
+> I built Fan Insights Lite, a dashboard for an independent artist that shows how their audience is growing across Spotify, YouTube, Twitch, Kick, and TikTok, where their fans are, and what broke out. I built it to mirror the Artist Success stack: React and TypeScript on the front end, GraphQL in the middle, BigQuery for data, and Terraform and containers on Google Cloud.
+>
+> The part I'm proudest of is the insight logic. It's a set of pure functions with tests. "Broke out" means at least 2.5 times the *median* views for that platform. I can show why the median matters with the project's own data: measured against the average, the biggest release of the quarter drops off the list, because it inflates its own baseline. The headline is written from the data and is careful with words; it only says "most of your fans came from TikTok" when that's actually true.
+>
+> Architecturally, the resolvers depend on a `DataSource` interface, so the same API runs on CSV files locally and on BigQuery in production. The BigQuery version uses parameterized SQL and a small promise cache, so one page load is one or two queries instead of eight. The whole app ships as one multi-stage Docker image on Cloud Run, scaling to zero, running as a service account that can read one dataset and nothing else, all defined in Terraform. CI runs type checks, about 70 tests across TypeScript and Python, Terraform validation, and a Docker build on every pull request.
+>
+> I built it with an AI pair programmer, phase by phase, one pull request each. My job was to make every decision explainable. The build log in the repo has the trade-offs for each phase. For example, I chose the hand-written CSV parser and `WRITE_TRUNCATE` loads for simplicity, and I wrote down what I'd change at scale.
+
+### Interview questions
+
+1. **What would you change if this had 10,000 artists instead of one?**
+   Partition the `audience` table by date and cluster it by artist and platform, so queries scan only what they need. Move the insight math into SQL (median with `APPROX_QUANTILES`, gains with window functions), so the API doesn't pull raw rows. Replace `WRITE_TRUNCATE` with incremental `MERGE` loads from scheduled jobs. Add an `artistId` argument to every query, with authorization so artists see only their own data. Cache per artist at the API, and use a GraphQL DataLoader if resolvers start fetching per item.
+
+2. **How did you use AI in building this, and how do you know the code is right?**
+   I used Claude Code as a pair programmer, working one phase at a time against a written spec (`CLAUDE.md`). I didn't take output on trust; everything was checked. There are about 70 automated tests, and the expected numbers come from an independent calculation (Python's csv module and statistics). A colorblind-safety validator checked the palette. Screenshots in light, dark, and phone layouts were reviewed by eye. CI re-checks everything, including Terraform, on GitHub. Several real bugs were caught this way: a sample-data design that created false breakouts, a chart axis wasting a fifth of its height, and an interview answer that overstated a claim.
+
+3. **What's a decision you'd revisit?**
+   Validation exists in both TypeScript and Python. It's small and cross-checked by a test today, but a growing schema would make the duplication risky, so I'd generate both from one JSON Schema. I'd also revisit scale-to-zero once real people use the page: a cold start costs a second or two, and one warm instance costs about $10 a month.
