@@ -129,4 +129,7 @@ Stretch ideas, only if Adem asks: an A&R view comparing several artists (check w
 - `npm run typecheck`
 - `npm run build`
 - `npm run sample-data`: regenerate the made-up data in `data/sample/`
+- `npm run dev:real`: same, reading your real numbers from `data/real/` (see `docs/REAL_DATA.md`)
+- `npm run check-data -- data/real`: check a data folder for problems
+- `npm run docker:build` then `npm run docker:run`: the production image at http://localhost:8080
 - `npm run dev -w api`: API only, at http://localhost:4000/graphql (Apollo Sandbox)

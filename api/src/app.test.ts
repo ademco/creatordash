@@ -88,3 +88,30 @@ describe('the API on sample data', () => {
     expect(audienceGrowth[0].points).toHaveLength(90);
   });
 });
+
+describe('serving the built dashboard', () => {
+  it('serves index.html at / with no-cache, and hashed assets as immutable', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { tmpdir } = await import('node:os');
+    const webDir = mkdtempSync(join(tmpdir(), 'web-'));
+    mkdirSync(join(webDir, 'assets'));
+    writeFileSync(join(webDir, 'index.html'), '<h1>dashboard</h1>');
+    writeFileSync(join(webDir, 'assets', 'app-abc123.js'), 'console.log(1)');
+
+    const app = await createApp(createDataSource({ DATA_DIR: 'data/sample' }), { webDir });
+    const webServer = app.listen(0);
+    await new Promise((resolve) => webServer.once('listening', resolve));
+    const url = `http://localhost:${(webServer.address() as AddressInfo).port}`;
+    try {
+      const page = await fetch(`${url}/`);
+      expect(await page.text()).toBe('<h1>dashboard</h1>');
+      expect(page.headers.get('cache-control')).toBe('no-cache');
+      const asset = await fetch(`${url}/assets/app-abc123.js`);
+      expect(asset.headers.get('cache-control')).toContain('immutable');
+      expect((await fetch(`${url}/healthz`)).status).toBe(200);
+    } finally {
+      webServer.close();
+    }
+  });
+});

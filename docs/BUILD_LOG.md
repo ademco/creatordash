@@ -181,3 +181,39 @@ Tests: 6 Python `unittest` tests, plus 3 new API tests. One of them loads `data/
 
 3. **You validate the same rules in Python and TypeScript. Isn't that a problem?**
    It's a known trade-off. The two validators are tiny and protect different entry points: Python checks before data is written or uploaded, and TypeScript checks what the API actually loads. To stop them drifting, a test loads the documented template files through the API's loader, and the Python tests check the same files. With a bigger schema, I'd generate both from one JSON Schema.
+
+## Phase 5: Docker
+
+### What was built
+
+- **`Dockerfile`**: one image that serves the dashboard at `/`, GraphQL at `/graphql`, and `/healthz`, all on port 8080.
+- **`.dockerignore`**: keeps `node_modules`, build output, `.git`, real data, Terraform files, and docs out of the build.
+- **Express serves the built dashboard** (`api/src/app.ts`). Hashed files under `/assets/` are cached for a year; `index.html` is always re-checked. A test covers both headers.
+- **New commands:** `npm run docker:build` (builds for `linux/amd64`, which Cloud Run needs) and `npm run docker:run`.
+
+I verified it with `docker run -p 8080:8080`. The page, `/graphql` (90 days: +11,041), and `/healthz` all respond. The container runs as the `node` user, not root. The final image contains no TypeScript, Vite, or test tools. It's 84 MB compressed.
+
+### The Dockerfile, stage by stage
+
+1. **`deps`** starts from `node:22-bookworm-slim`, copies only `package.json` / `package-lock.json` files, and runs `npm ci`. Copying the package files before the source code is the key caching trick. Docker reuses a cached step when its inputs haven't changed, so editing a `.tsx` file doesn't re-download 250 packages.
+2. **`build-web`** starts from `deps`, copies `web/`, and runs `vite build`. The output is plain HTML/CSS/JS in `web/dist`.
+3. **`build-api`** starts from `deps`, copies `api/`, and runs `tsc`. The output is JavaScript in `api/dist`. Stages 2 and 3 don't depend on each other, so BuildKit runs them in parallel.
+4. **`runtime`** starts fresh from the slim Node image. It installs only the API's production dependencies (`npm ci --omit=dev --workspace api`), then copies in just `api/dist`, `web/dist`, and `data/sample` from the earlier stages. Compilers and dev tools stay behind in stages that never ship.
+
+### Key decisions and trade-offs
+
+- **`node:22-bookworm-slim`, not Alpine or distroless.** Slim is Debian with glibc, so native modules behave exactly as on a normal Linux box. Alpine's musl libc occasionally breaks native packages, and distroless images are smaller but have no shell, which makes debugging harder while you're learning. Slim is the boring middle ground.
+- **Sample data inside the image.** `docker run` works with no configuration. On Cloud Run, `DATA_SOURCE=bigquery` is set and the files are ignored.
+- **No `HEALTHCHECK` in the Dockerfile.** Cloud Run ignores it and uses its own probes. `/healthz` is there for them.
+- **A sandbox-only detail:** this build environment reaches npm through a proxy, so I verified the build with a temporary copy of the Dockerfile that passed proxy settings to `npm ci`. The committed Dockerfile has none of that and builds normally on a Mac or in CI.
+
+### Interview questions
+
+1. **Why a multi-stage build?**
+   Building needs TypeScript, Vite, and hundreds of dev packages; running needs Node, the API's production dependencies, and the compiled files. Multi-stage builds do the heavy work in throwaway stages and copy only the results into a fresh, small final image. That means faster deploys and cold starts, and a smaller attack surface: tools that never ship can't be exploited in production.
+
+2. **How does layer caching make builds faster, and how did you take advantage of it?**
+   Each Dockerfile instruction produces a layer. If an instruction and its inputs are unchanged, Docker reuses the cached layer, and once one layer changes, every later one is rebuilt. So I copy the package manifests and run `npm ci` before copying any source code. Day-to-day code changes only invalidate the cheap build steps, not the dependency install.
+
+3. **Why `--platform linux/amd64`, and why run as a non-root user?**
+   The Mac mini is Apple Silicon (ARM), but Cloud Run runs x86-64 (amd64). An image built for ARM won't start there, so the build targets amd64 explicitly, using emulation if needed. Running as the `node` user follows least privilege: if someone found a bug that let them run code in the container, they wouldn't be root.
