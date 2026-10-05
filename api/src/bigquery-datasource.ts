@@ -3,12 +3,8 @@ import { BigQuery } from '@google-cloud/bigquery';
 import type { DataSource } from './datasource.js';
 import type { AudienceRow, ContentRow, ContentType, DataInfo, Platform } from './types.js';
 
-/** Runs one SQL query with named parameters and returns plain row objects. */
-export type RunQuery = (
-  sql: string,
-  params?: Record<string, string>,
-  types?: Record<string, string>,
-) => Promise<Record<string, unknown>[]>;
+/** Runs one SQL query with named string parameters and returns plain row objects. */
+export type RunQuery = (sql: string, params?: Record<string, string>) => Promise<Record<string, unknown>[]>;
 
 export interface BigQuerySettings {
   /** Google Cloud project that holds the dataset. */
@@ -27,9 +23,13 @@ const IDENTIFIER = /^[A-Za-z0-9_-]+$/;
  * Reads the `audience` and `content` tables from BigQuery.
  *
  * Every query filters on the date column with a parameter (@since), never by
- * gluing user input into SQL. FORMAT_DATE returns dates as YYYY-MM-DD strings,
- * the same shape the CSV source produces, so the insight code cannot tell the
- * two sources apart.
+ * gluing user input into SQL. The parameter is sent as a plain string and cast
+ * to DATE in the SQL: the client library silently drops a plain string sent
+ * with type DATE (it expects its own BigQuery.date() object), which turned
+ * `date >= @since` into `date >= NULL` and made every window empty.
+ *
+ * FORMAT_DATE returns dates as YYYY-MM-DD strings, the same shape the CSV
+ * source produces, so the insight code cannot tell the two sources apart.
  */
 export class BigQueryDataSource implements DataSource {
   private readonly audienceTable: string;
@@ -62,10 +62,9 @@ export class BigQueryDataSource implements DataSource {
       `
       SELECT FORMAT_DATE('%F', date) AS date, platform, audience
       FROM ${this.audienceTable}
-      WHERE date >= @since
+      WHERE date >= CAST(@since AS DATE)
       ORDER BY date, platform`,
       { since },
-      { since: 'DATE' },
     );
     return rows.map((row) => ({
       date: String(row.date),
@@ -79,10 +78,9 @@ export class BigQueryDataSource implements DataSource {
       `
       SELECT FORMAT_DATE('%F', published_date) AS published_date, platform, content_type, title, views
       FROM ${this.contentTable}
-      WHERE published_date >= @since
+      WHERE published_date >= CAST(@since AS DATE)
       ORDER BY published_date, platform`,
       { since },
-      { since: 'DATE' },
     );
     return rows.map((row) => ({
       publishedDate: String(row.published_date),
@@ -105,8 +103,8 @@ export class BigQueryDataSource implements DataSource {
 /** The real query runner, using Application Default Credentials (the Cloud Run service account). */
 export function bigQueryRunner(project: string, location: string | undefined): RunQuery {
   const client = new BigQuery({ projectId: project });
-  return async (sql, params, types) => {
-    const [rows] = await client.query({ query: sql, params, types, location });
+  return async (sql, params) => {
+    const [rows] = await client.query({ query: sql, params, location });
     return rows as Record<string, unknown>[];
   };
 }

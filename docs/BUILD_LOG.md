@@ -322,3 +322,17 @@ The first CI run on GitHub passed all three jobs, including `terraform fmt -chec
 
 3. **What's a decision you'd revisit?**
    Validation exists in both TypeScript and Python. It's small and cross-checked by a test today, but a growing schema would make the duplication risky, so I'd generate both from one JSON Schema. I'd also revisit scale-to-zero once real people use the page: a cold start costs a second or two, and one warm instance costs about $10 a month.
+
+## Fix: live dashboard empty after loading BigQuery
+
+**Symptom.** After loading the sample CSVs into BigQuery (900 and 212 rows, counts verified), the live site still said "No numbers yet". `dataInfo.newestDate` came back as `2026-09-30`, but `overview` returned all zeros, long after the 5-minute cache had expired.
+
+**Cause.** The window queries sent `@since` as a typed `DATE` parameter with a plain string value. `@google-cloud/bigquery` expects a `BigQuery.date()` object for that type and reads its `.value`, so a string became an empty parameter. BigQuery saw `date >= NULL`, which is never true, so every window was empty without any error. The newest-date query has no parameter, which is why it alone worked. The unit tests used a fake query runner, so they never ran the library code that dropped the value.
+
+**Fix.** Send `@since` as a plain string and write `CAST(@since AS DATE)` in the SQL. A new test runs the library's real parameter step and checks the value survives.
+
+**Interview questions**
+
+1. *How did you narrow it down?* Two answers from the same request disagreed: the newest date was right, the totals were zero. The only difference between those queries was the date parameter, so I checked what the client library actually sends for it.
+2. *Why did the tests not catch it?* They replaced the BigQuery client with a fake, which is right for testing SQL shape and row mapping but blind to how the library serializes parameters. I added one test at that boundary instead of mocking it away.
+3. *Why cast in SQL instead of using `BigQuery.date()`?* A string parameter plus an explicit `CAST` is the simplest form, the same in every client, and fails loudly with a clear error if the string is not a valid date.
