@@ -69,7 +69,7 @@ def check_content_row(row: dict, line: int) -> list[str]:
     return problems
 
 
-def _read(path: Path, columns: tuple[str, ...]) -> list[dict]:
+def read_rows(path: Path, columns: tuple[str, ...]) -> list[dict]:
     if not path.exists():
         return []
     # utf-8-sig drops the byte-order mark Excel and Google Sheets add.
@@ -83,13 +83,17 @@ def _read(path: Path, columns: tuple[str, ...]) -> list[dict]:
         return [{k: (v or "").strip() for k, v in row.items() if k} for row in reader]
 
 
+def write_rows(f, columns: tuple[str, ...], rows: list[dict]) -> None:
+    # QUOTE_MINIMAL (the default) quotes only fields that need it, e.g. titles with commas.
+    writer = csv.DictWriter(f, fieldnames=columns, lineterminator="\n", extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+
+
 def _write(path: Path, columns: tuple[str, ...], rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
-        # QUOTE_MINIMAL quotes only fields that need it, e.g. titles with commas.
-        writer = csv.DictWriter(f, fieldnames=columns, lineterminator="\n", extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
+        write_rows(f, columns, rows)
 
 
 def check_folder(folder: str | Path) -> list[str]:
@@ -105,7 +109,7 @@ def check_folder(folder: str | Path) -> list[str]:
             problems.append(f"{path}: file not found")
             continue
         try:
-            rows = _read(path, columns)
+            rows = read_rows(path, columns)
         except (ValueError, csv.Error) as error:
             problems.append(str(error))
             continue
@@ -115,7 +119,7 @@ def check_folder(folder: str | Path) -> list[str]:
     return problems
 
 
-def _normalize_audience(row: dict) -> dict:
+def normalize_audience(row: dict) -> dict:
     return {
         "date": str(row["date"]).strip(),
         "platform": str(row["platform"]).strip().lower(),
@@ -123,7 +127,7 @@ def _normalize_audience(row: dict) -> dict:
     }
 
 
-def _normalize_content(row: dict) -> dict:
+def normalize_content(row: dict) -> dict:
     return {
         "published_date": str(row["published_date"]).strip(),
         "platform": str(row["platform"]).strip().lower(),
@@ -139,8 +143,8 @@ def upsert_audience(folder: str | Path, new_rows: list[dict]) -> int:
         if problems := check_audience_row(row, i + 1):
             raise ValueError("; ".join(problems))
     path = Path(folder) / "audience.csv"
-    by_key = {(r["date"], r["platform"].lower()): r for r in _read(path, AUDIENCE_COLUMNS)}
-    for row in map(_normalize_audience, new_rows):
+    by_key = {(r["date"], r["platform"].lower()): r for r in read_rows(path, AUDIENCE_COLUMNS)}
+    for row in map(normalize_audience, new_rows):
         by_key[(row["date"], row["platform"])] = row
     rows = sorted(by_key.values(), key=lambda r: (r["date"], PLATFORMS.index(r["platform"].lower())))
     _write(path, AUDIENCE_COLUMNS, rows)
@@ -155,8 +159,8 @@ def upsert_content(folder: str | Path, new_rows: list[dict]) -> int:
             raise ValueError("; ".join(problems))
     path = Path(folder) / "content.csv"
     key = lambda r: (r["published_date"], r["platform"].lower(), r["title"])  # noqa: E731
-    by_key = {key(r): r for r in _read(path, CONTENT_COLUMNS)}
-    for row in map(_normalize_content, new_rows):
+    by_key = {key(r): r for r in read_rows(path, CONTENT_COLUMNS)}
+    for row in map(normalize_content, new_rows):
         by_key[key(row)] = row
     rows = sorted(by_key.values(), key=lambda r: (r["published_date"], PLATFORMS.index(r["platform"].lower())))
     _write(path, CONTENT_COLUMNS, rows)

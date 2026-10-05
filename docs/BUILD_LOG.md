@@ -217,3 +217,45 @@ I verified it with `docker run -p 8080:8080`. The page, `/graphql` (90 days: +11
 
 3. **Why `--platform linux/amd64`, and why run as a non-root user?**
    The Mac mini is Apple Silicon (ARM), but Cloud Run runs x86-64 (amd64). An image built for ARM won't start there, so the build targets amd64 explicitly, using emulation if needed. Running as the `node` user follows least privilege: if someone found a bug that let them run code in the container, they wouldn't be root.
+
+## Phase 6: Google Cloud with Terraform
+
+### What was built
+
+- **`api/src/bigquery-datasource.ts`**: the second `DataSource`. Each method is one SQL query with a typed `DATE` parameter (`WHERE date >= @since`). `FORMAT_DATE('%F', ...)` returns dates as `YYYY-MM-DD` strings, the same shape the CSV source returns. Table names can't be query parameters, so the project and dataset names are checked against a strict pattern before they go into the SQL.
+- **`api/src/cached-datasource.ts`**: wraps any data source and remembers answers for 5 minutes. It caches the *promise*, so the four simultaneous "newest date" lookups in one page load become one query. Failures are never cached.
+- **`DATA_SOURCE=bigquery`** in `config.ts`, configured with `BQ_PROJECT`, `BQ_DATASET`, `BQ_LOCATION`, `SAMPLE_DATA`, and `CACHE_SECONDS`.
+- **`infra/` (Terraform)**:
+  - the APIs the project needs
+  - an Artifact Registry repository, with a cleanup policy that keeps the 5 newest images
+  - the `fan_insights` dataset with `audience` and `content` tables (same columns as the CSVs)
+  - a `fan-insights-run` service account that has only `bigquery.dataViewer` on the dataset and `bigquery.jobUser` on the project
+  - a Cloud Run v2 service (scale to 0, at most 2 instances, CPU only during requests, `/healthz` startup probe) with public access
+- **`ingest/load_to_bigquery.py`**: checks the files with the Phase 4 rules, normalizes them, and loads each table with `WRITE_TRUNCATE`.
+- **`scripts/deploy.sh`**: Terraform init → create the APIs and registry → build and push the `linux/amd64` image tagged with the git commit → apply everything else → print the URL.
+- **`docs/DEPLOY.md`**: the one-time setup (tools, project, billing, a $5 budget alert, login), the deploy, loading data, updating, tearing down, a Terraform primer (plan, apply, state), and a troubleshooting table.
+
+There are 8 new API tests (the BigQuery source tested with a fake query runner, plus the cache) and 1 new Python test for the loader's preparation step.
+
+**Not done here, on purpose:** nothing was created in Google Cloud. That needs Adem's account and billing, and the project rules say to ask before anything that could cost money. This sandbox also can't reach the Terraform registry, so `terraform validate` couldn't run here. CI (Phase 7) runs `terraform fmt -check` and `terraform validate` on GitHub instead.
+
+### Key decisions and trade-offs
+
+- **Least privilege.** The app's identity can read one dataset and run queries. It can't write data, see other datasets, or touch other services. It isn't the default compute service account, which has Editor on the whole project.
+- **Replace instead of append when loading.** `WRITE_TRUNCATE` makes every load idempotent: the tables always equal the files. It re-uploads everything, which costs nothing at this size. At millions of rows, I'd load into a staging table and `MERGE` on (date, platform).
+- **A 5-minute cache in the API.** The data changes at most daily. Caching cuts BigQuery queries per page view from about 8 to at most 1 per distinct question, and makes the page fast after the first view. The trade-off is that a fresh load can take up to 5 minutes to show.
+- **Scale to zero.** It's free while idle. The cost is a cold start of a second or two for the first visitor after a quiet period. `min_instance_count = 1` would remove that for about $10 a month.
+- **Local Terraform state.** Simple for one person, and the file is git-ignored. A team would use a GCS backend with locking.
+- **Deploy order with `-target`.** The registry must exist before the image can be pushed, and Cloud Run needs the image. A `precondition` on the Cloud Run service gives a clear error if someone applies without an image.
+- **Public access (`allUsers` as invoker).** It's a portfolio demo of read-only, non-sensitive data. For private data, I'd put it behind Identity-Aware Proxy instead.
+
+### Interview questions
+
+1. **What's the difference between `terraform plan` and `terraform apply`, and what is state?**
+   `plan` compares the configuration with the real world, as recorded in state and refreshed from the cloud APIs, and prints the changes it would make without making any. `apply` computes the same plan, asks for confirmation, then makes the changes and updates the state. State is Terraform's map from resource names in code to real resource IDs. Without it, Terraform wouldn't know what it manages. That's why teams store it remotely with locking, and why it shouldn't be in git: it can contain secrets.
+
+2. **How does the running app get permission to query BigQuery without any keys?**
+   Cloud Run runs the container as the `fan-insights-run` service account. Google's client libraries use Application Default Credentials: inside Cloud Run they fetch short-lived tokens for that identity from the metadata server, so no key file exists anywhere. Terraform grants that account exactly two roles: read the `fan_insights` dataset, and run query jobs in the project. On my laptop, the same code uses my own credentials from `gcloud auth application-default login`.
+
+3. **How do you keep the BigQuery queries safe and cheap?**
+   Safe: values go in as typed query parameters (`@since` as a `DATE`), never by building SQL strings from input. Table names, which can't be parameters, are checked against a strict pattern. Cheap: BigQuery bills by bytes scanned (10 MB minimum per query) with 1 TB a month free, the tables are tiny, and the API caches results for 5 minutes and merges duplicate in-flight queries. With large tables, I'd partition `audience` by `date`, so `WHERE date >= @since` only scans the partitions it needs.
