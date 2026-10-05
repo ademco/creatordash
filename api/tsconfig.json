@@ -1,0 +1,22 @@
+{
+  // Used by the editor and `npm run typecheck`: checks source and tests.
+  // `npm run build` uses tsconfig.build.json, which leaves the tests out.
+  "compilerOptions": {
+    "target": "ES2023",
+    // NodeNext follows Node's own ESM rules, so relative imports end in .js
+    // (the name of the compiled file), even inside .ts files.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    // array[i] has type T | undefined, which forces a check before use.
+    "noUncheckedIndexedAccess": true,
+    // Type-only imports must say `import type`, so they vanish from the output.
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true
+  },
+  "include": ["src"]
+}

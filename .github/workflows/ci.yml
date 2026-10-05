@@ -1,0 +1,59 @@
+# Runs on every push and pull request. A red check means main would break.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Read-only token: CI only needs to check out code.
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the run that is now out of date.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # npm ci installs exactly what package-lock.json says, and fails if
+      # package.json and the lockfile disagree.
+      - run: npm ci
+      - run: npm run typecheck
+      # Vitest for api/ and web/, then the Python tests in ingest/ (the
+      # runner's preinstalled python3 is enough; they use the standard library).
+      - run: npm test
+      - run: npm run build
+
+  infra:
+    name: Terraform format and validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive -diff
+      # -backend=false: download the provider and check the code without
+      # touching any real state or cloud account.
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # Same platform as Cloud Run. Nothing is pushed anywhere.
+      - run: docker build --platform linux/amd64 -t fan-insights:ci .

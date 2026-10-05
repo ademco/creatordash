@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (git-ignored) if you want to run terraform by hand.
+# scripts/deploy.sh passes these on the command line instead.
+project_id = "fan-insights-123456"
+region     = "us-central1"
