@@ -82,4 +82,11 @@ python3 ingest/fan_data.py add-content data/real 2026-10-04 youtube video "My ne
 
 ## In the cloud
 
-Once deployed (see `docs/DEPLOY.md`), the same two files are loaded into BigQuery with `ingest/load_to_bigquery.py`, which runs the same checks first.
+Once deployed (see `docs/DEPLOY.md`), load the same two files into BigQuery and turn off the "sample data" note:
+
+```bash
+npm run load-bq -- YOUR_PROJECT_ID data/real
+SAMPLE_DATA=false scripts/deploy.sh YOUR_PROJECT_ID
+```
+
+`load-bq` checks and cleans the files with the API's own parser first (lowercase platforms, trimmed spaces, columns in table order), so a mistake stops it before anything is uploaded. It needs only gcloud, bq, and Node. `ingest/load_to_bigquery.py` does the same checks if you prefer Python.

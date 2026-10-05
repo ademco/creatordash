@@ -102,3 +102,30 @@ export function parseContentCsv(text: string, file = 'content.csv'): ContentRow[
   if (problems.length > 0) throw new DataError(file, problems);
   return rows;
 }
+
+// Wraps a field in quotes when CSV needs it (commas, quotes, line breaks) and
+// doubles any quotes inside, the same rules spreadsheet apps follow.
+function csvField(value: string | number): string {
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function toCsv(columns: readonly string[], rows: (string | number)[][]): string {
+  return [columns.join(','), ...rows.map((row) => row.map(csvField).join(','))].join('\n') + '\n';
+}
+
+/** Writes checked rows back out in the exact column order of the BigQuery table. */
+export function audienceToCsv(rows: AudienceRow[]): string {
+  return toCsv(
+    AUDIENCE_COLUMNS,
+    rows.map((row) => [row.date, row.platform, row.audience]),
+  );
+}
+
+/** Writes checked rows back out in the exact column order of the BigQuery table. */
+export function contentToCsv(rows: ContentRow[]): string {
+  return toCsv(
+    CONTENT_COLUMNS,
+    rows.map((row) => [row.publishedDate, row.platform, row.contentType, row.title, row.views]),
+  );
+}

@@ -1,6 +1,15 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
-import { DataError, isIsoDate, parseAudienceCsv, parseContentCsv } from './rows.js';
+import {
+  audienceToCsv,
+  contentToCsv,
+  DataError,
+  isIsoDate,
+  parseAudienceCsv,
+  parseContentCsv,
+} from './rows.js';
 
 describe('isIsoDate', () => {
   it('accepts real YYYY-MM-DD dates only', () => {
@@ -54,5 +63,34 @@ describe('parseContentCsv', () => {
 
   it('wraps structural CSV errors in a DataError that names the file', () => {
     expect(() => parseContentCsv('date,views\n', 'content.csv')).toThrow(/content\.csv has problems:[\s\S]*Missing column/);
+  });
+});
+
+describe('audienceToCsv and contentToCsv', () => {
+  it('cleans a messy export into table column order', () => {
+    const messy = 'Platform, Audience ,Date\r\n Spotify ,18500,2026-10-01\r\nTikTok,21700, 2026-10-01\r\n';
+    expect(audienceToCsv(parseAudienceCsv(messy))).toBe(
+      'date,platform,audience\n2026-10-01,spotify,18500\n2026-10-01,tiktok,21700\n',
+    );
+  });
+
+  it('quotes titles with commas and doubles quotes inside them', () => {
+    const text =
+      'published_date,platform,content_type,title,views\n' +
+      '2026-09-28,YouTube,Video,"Mixing, mastering, and coffee",2900\n' +
+      '2026-09-29,tiktok,short,"Fan duet: ""Glass Houses""",48055\n';
+    expect(contentToCsv(parseContentCsv(text))).toBe(
+      'published_date,platform,content_type,title,views\n' +
+        '2026-09-28,youtube,video,"Mixing, mastering, and coffee",2900\n' +
+        '2026-09-29,tiktok,short,"Fan duet: ""Glass Houses""",48055\n',
+    );
+  });
+
+  it('round-trips the sample data without changing a row', () => {
+    const audience = parseAudienceCsv(readFileSync(new URL('../../data/sample/audience.csv', import.meta.url), 'utf8'));
+    const content = parseContentCsv(readFileSync(new URL('../../data/sample/content.csv', import.meta.url), 'utf8'));
+    expect(parseAudienceCsv(audienceToCsv(audience))).toEqual(audience);
+    expect(parseContentCsv(contentToCsv(content))).toEqual(content);
+    expect(content).toHaveLength(212);
   });
 });
