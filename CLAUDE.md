@@ -128,3 +128,4 @@ Stretch ideas, only if Adem asks: an A&R view comparing several artists (check w
 - `npm test`: unit tests
 - `npm run typecheck`
 - `npm run build`
+- `npm run sample-data`: regenerate the made-up data in `data/sample/`
