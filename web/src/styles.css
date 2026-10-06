@@ -1,7 +1,11 @@
 /* Colors are tokens, defined once per theme. Components use var(--name);
    the SVG chart reads the same tokens through useThemeColors(). Platform
    colors were checked with a colorblind-safety validator against each
-   theme's background (contrast >= 3:1, distinct under color-vision deficiency). */
+   theme's background (contrast >= 3:1, distinct under color-vision deficiency).
+
+   The look: big type, thick ink lines, flat color, and shadows that are a
+   solid offset copy of the shape (no blur, no gradients). Boldness comes from
+   scale and contrast, not decoration. */
 :root {
   --paper: #f2f1f6;
   --raised: #fbfbfd;
@@ -16,8 +20,59 @@
   --platform-kick: #a47c00;
   --platform-tiktok: #1e6fb8;
 
+  /* The big band at the top. It is dark in both themes, so the headline is
+     always the loudest thing on the page. */
+  --hero-bg: #191633;
+  --hero-fg: #f2f1f6;
+  --hero-muted: #bcb8d2;
+
+  /* Set from App.tsx to the color of the platform that grew most. */
+  --top-platform: var(--focus);
+
   --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --text-hero: clamp(2.25rem, 0.6rem + 5.4vw, 4.75rem);
+  --text-h2: clamp(1.5rem, 1.1rem + 1.4vw, 2.125rem);
+
+  --border: 2px;
+  --border-thick: 3px;
+  --shadow-hard: 4px 4px 0 var(--ink);
+
+  /* Motion. --ease-out is a quick start and soft landing. --ease-spring is a
+     real damped spring (10% overshoot) sampled into CSS linear(); browsers
+     without linear() fall back to plain ease. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: linear(
+    0,
+    0.034 4.2%,
+    0.122 8.3%,
+    0.242 12.5%,
+    0.377 16.7%,
+    0.515 20.8%,
+    0.645 25%,
+    0.762 29.2%,
+    0.861 33.3%,
+    0.941 37.5%,
+    1.002 41.7%,
+    1.046 45.8%,
+    1.074 50%,
+    1.089 54.2%,
+    1.095 58.3%,
+    1.092 62.5%,
+    1.085 66.7%,
+    1.074 70.8%,
+    1.061 75%,
+    1.048 79.2%,
+    1.035 83.3%,
+    1.024 87.5%,
+    1.014 91.7%,
+    1.007 95.8%,
+    1
+  );
+  --dur-fast: 150ms;
+  --dur: 350ms;
+
   color-scheme: light;
 }
 
@@ -35,6 +90,11 @@
     --platform-twitch: #8d76ee;
     --platform-kick: #b38b10;
     --platform-tiktok: #3b8bd9;
+
+    /* Darker than the page, so the band reads as the "stage". */
+    --hero-bg: #0c0b1a;
+    --hero-fg: #eceaf5;
+    --hero-muted: #a6a2bd;
     color-scheme: dark;
   }
 }
@@ -60,10 +120,15 @@ body {
   line-height: 1.5;
 }
 
+::selection {
+  background: var(--top-platform);
+  color: #fff;
+}
+
 h1,
 h2 {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 750;
   line-height: 1.15;
   margin: 0;
   text-wrap: balance;
@@ -79,8 +144,8 @@ code {
 }
 
 :focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
   border-radius: 4px;
 }
 
@@ -107,7 +172,8 @@ code {
   top: 8px;
 }
 
-/* Layout: one left-aligned column, about 1100px wide, 16px gutters on phones. */
+/* Layout: a left-aligned column about 1100px wide, 16px gutters on phones.
+   Bands (below) run edge to edge; .page keeps what is inside them in the column. */
 .page {
   max-width: 1100px;
   margin: 0 auto;
@@ -120,8 +186,9 @@ code {
   }
 }
 
+/* Top bar */
 .topbar {
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--border-thick) solid var(--ink);
 }
 
 .topbar-inner {
@@ -135,9 +202,18 @@ code {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.125rem;
+  font-weight: 750;
+  font-size: 1.25rem;
+}
+
+.logo {
+  width: 31px;
+  height: 22px;
+  flex: none;
 }
 
 .brand-sub {
@@ -147,17 +223,18 @@ code {
   font-size: 0.95rem;
 }
 
-/* Window picker and Growth/Total toggle share the segmented-control look:
-   a soft track with no outline, so the selected option is the only strong shape. */
+/* The window picker and the Growth/Total toggle are one control style: a pill
+   with a thick ink outline and a solid shadow. The selected option is filled. */
 .window-picker,
 .segmented {
   display: inline-flex;
-  border: 0;
+  border: var(--border) solid var(--ink);
   border-radius: 999px;
   padding: 3px;
   margin: 0;
   gap: 2px;
   background: var(--raised);
+  box-shadow: 3px 3px 0 var(--ink);
 }
 
 .window-option {
@@ -179,12 +256,21 @@ code {
   border-radius: 999px;
   font: inherit;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--muted);
   background: none;
   border: 0;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur) var(--ease-spring);
+}
+
+.window-option:hover span,
+.segmented button:hover {
+  color: var(--ink);
 }
 
 .window-option input:checked + span,
@@ -193,53 +279,141 @@ code {
   color: var(--paper);
 }
 
+.window-option input:active + span,
+.segmented button:active {
+  transform: scale(0.95);
+}
+
 .window-option input:focus-visible + span {
-  outline: 2px solid var(--focus);
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
+/* Bands: full-width stripes separated by a thick ink line. Each one rises into
+   place a beat after the one above (--i is set in App.tsx). */
+.band {
+  animation: rise 650ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 110ms);
+}
+
+.band + .band {
+  border-top: var(--border-thick) solid var(--ink);
+}
+
+.band-inner {
+  padding-top: clamp(32px, 5vw, 60px);
+  padding-bottom: clamp(32px, 5vw, 60px);
+}
+
+.band-raised {
+  background: var(--raised);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+/* While a new window loads: dim the old numbers, but only if it takes a while,
+   so a fast answer never flickers. When the browser supports view transitions,
+   the swap to the new numbers is a cross-fade of .content. */
 .content {
-  transition: opacity 150ms ease;
+  view-transition-name: content;
+  transition: opacity var(--dur) ease 250ms;
 }
 
 .content.is-refreshing {
   opacity: 0.55;
 }
 
-/* Headline */
-.headline {
-  padding: 40px 0 32px;
-  max-width: 820px;
+::view-transition-old(content),
+::view-transition-new(content) {
+  animation-duration: 400ms;
+  animation-timing-function: var(--ease-out);
 }
 
-.headline h1 {
-  font-size: clamp(1.75rem, 1.2rem + 2.4vw, 2.75rem);
-  font-weight: 750;
-  letter-spacing: -0.01em;
+/* Hero: the headline */
+.band-hero {
+  background: var(--hero-bg);
+  color: var(--hero-fg);
 }
 
-.headline-sub {
-  margin-top: 12px;
-  font-size: 1.0625rem;
-  color: var(--muted);
-  max-width: 640px;
+.band-hero .band-inner {
+  padding-top: clamp(36px, 6vw, 72px);
+  padding-bottom: clamp(36px, 6vw, 80px);
 }
 
 .headline-dates {
-  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 22px;
   font-size: 0.9rem;
-  color: var(--muted);
+  color: var(--hero-muted);
 }
 
-/* Sections are separated by hairlines, not boxed into cards. */
+.band-hero h1 {
+  font-size: var(--text-hero);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+}
+
+.headline-sub {
+  margin-top: 22px;
+  font-size: 1.0625rem;
+  color: var(--hero-muted);
+  max-width: 640px;
+}
+
+/* The made-up-data label is a sticker slapped on the band. */
+.sticker {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 6px;
+  background: var(--hero-fg);
+  color: var(--hero-bg);
+  font-weight: 700;
+  transform: rotate(-1.5deg);
+  box-shadow: 3px 3px 0 var(--top-platform);
+}
+
+/* The rolling number. Three layers share one grid cell: the real number for
+   screen readers (visually hidden), an invisible copy that holds the final
+   width so nothing around it shifts, and the live digits on top. */
+.count {
+  display: inline-grid;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-spacer,
+.count-live {
+  grid-area: 1 / 1;
+}
+
+.count-spacer {
+  visibility: hidden;
+}
+
+.count-live {
+  text-decoration: underline;
+  text-decoration-color: var(--top-platform);
+  text-decoration-thickness: 0.07em;
+  text-underline-offset: 0.12em;
+  text-decoration-skip-ink: none;
+}
+
+/* Section content. The bands supply the spacing and the dividers. */
 .section {
-  border-top: 1px solid var(--rule);
-  padding: 28px 0 32px;
   min-width: 0;
 }
 
 .section h2 {
-  font-size: 1.375rem;
+  font-size: var(--text-h2);
+  letter-spacing: -0.015em;
 }
 
 .section-head {
@@ -256,45 +430,71 @@ code {
   font-size: 0.95rem;
 }
 
-/* Platform toggles look like a legend: a color key and a name, no outline.
-   The negative margin lines the first key up with the text above. */
+/* Platform toggles are stickers: a color key and a name, a solid shadow in the
+   platform's color, and a slight tilt that straightens on hover. A hidden
+   platform is dashed, flat, and struck through. */
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin: 14px 0 8px -10px;
+  gap: 12px 14px;
+  margin: 20px 0 18px;
 }
 
 .chip {
+  --tilt: -1.2deg;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 0;
-  background: transparent;
+  min-height: 40px;
+  padding: 6px 14px 6px 10px;
+  border: var(--border) solid var(--ink);
+  border-radius: 10px;
+  background: var(--raised);
   color: var(--ink);
   font: inherit;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 3px 3px 0 var(--chip);
+  transform: rotate(var(--tilt));
+  transition:
+    transform var(--dur) var(--ease-spring),
+    box-shadow var(--dur) var(--ease-spring),
+    background-color var(--dur-fast) ease;
+}
+
+.chip:nth-child(even) {
+  --tilt: 0.9deg;
+}
+
+.chip:nth-child(3n) {
+  --tilt: -0.4deg;
 }
 
 .chip:hover {
-  background: var(--raised);
+  transform: translate(-1px, -3px) rotate(0deg);
+  box-shadow: 5px 6px 0 var(--chip);
+}
+
+.chip:active {
+  transform: translate(2px, 2px) rotate(0deg);
+  box-shadow: 1px 1px 0 var(--chip);
 }
 
 .chip[aria-pressed='false'] {
+  border-style: dashed;
+  background: transparent;
   color: var(--muted);
+  box-shadow: none;
   text-decoration: line-through;
   text-decoration-color: var(--muted);
 }
 
 .chip-key {
-  width: 16px;
-  height: 3px;
-  border-radius: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--chip);
 }
 
 .chip[aria-pressed='false'] .chip-key {
@@ -315,11 +515,11 @@ code {
 
 .tooltip {
   background: var(--raised);
-  border: 1px solid var(--rule);
+  border: var(--border) solid var(--ink);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 0.875rem;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+  box-shadow: var(--shadow-hard);
 }
 
 .tooltip-date {
@@ -348,7 +548,7 @@ code {
 
 .tooltip-key {
   width: 12px;
-  height: 2px;
+  height: 3px;
   border-radius: 1px;
 }
 
@@ -357,7 +557,7 @@ code {
 }
 
 .table-view {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .table-view summary {
@@ -390,26 +590,42 @@ code {
   color: var(--muted);
 }
 
-/* Two columns on wide screens, stacked on phones. */
+/* Two columns on wide screens with a thick ink line between them; stacked on
+   phones with the line above the second one. */
 .columns {
   display: grid;
-  grid-template-columns: 1fr;
-  column-gap: 56px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.columns > * + * {
+  margin-top: clamp(32px, 5vw, 48px);
+  padding-top: clamp(32px, 5vw, 48px);
+  border-top: var(--border-thick) solid var(--ink);
 }
 
 @media (min-width: 820px) {
   .columns {
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
   }
+
+  .columns > * + * {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    margin-left: 48px;
+    padding-left: 48px;
+    border-left: var(--border-thick) solid var(--ink);
+  }
 }
 
 /* Where your fans are */
 .shares {
   list-style: none;
-  margin: 20px 0 0;
+  margin: 24px 0 0;
   padding: 0;
   display: grid;
-  gap: 16px;
+  gap: 20px;
 }
 
 .share-label {
@@ -420,7 +636,7 @@ code {
 }
 
 .share-name {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .share-value {
@@ -433,44 +649,69 @@ code {
   color: var(--muted);
 }
 
+/* A chunky outlined track with a flat colored bar that springs out from the left. */
 .share-track {
-  margin-top: 6px;
-  height: 8px;
+  margin-top: 8px;
+  height: 22px;
+  border: var(--border) solid var(--ink);
+  background: var(--paper);
+  overflow: hidden;
 }
 
 .share-bar {
   height: 100%;
-  border-radius: 0 4px 4px 0;
+  transform-origin: left center;
+  transition: width 600ms var(--ease-out);
+  animation: grow 900ms var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 250ms);
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
 }
 
 /* What broke out */
 .breakouts {
   list-style: none;
-  margin: 16px 0 0;
+  margin: 20px 0 0;
   padding: 0;
 }
 
 .breakout {
   display: grid;
-  grid-template-columns: 4.25rem minmax(0, 1fr);
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--rule);
+  grid-template-columns: 5.25rem minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 18px 0;
+  border-bottom: var(--border) solid var(--rule);
+}
+
+.breakout:first-child {
+  padding-top: 4px;
 }
 
 .breakout:last-child {
   border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.breakout-gauge {
+  display: grid;
+  justify-items: center;
 }
 
 .breakout-multiple {
+  margin-top: -2px;
   font-family: var(--font-display);
-  font-weight: 750;
-  font-size: 1.5rem;
-  line-height: 1.2;
+  font-weight: 800;
+  font-size: 1.625rem;
+  line-height: 1.1;
 }
 
 .breakout-title {
-  font-weight: 600;
+  font-weight: 650;
   overflow-wrap: anywhere;
 }
 
@@ -499,6 +740,51 @@ code {
   color: var(--muted);
 }
 
+/* The breakout gauge: a dial with a colored breakout zone and a needle that
+   springs in. --angle (where it ends up) and --start (where it begins) are set
+   per row in Meter.tsx. */
+.meter {
+  display: block;
+  width: 84px;
+  height: 50px;
+  overflow: visible;
+}
+
+.meter-track,
+.meter-zone {
+  fill: none;
+  stroke-width: 5;
+}
+
+.meter-track {
+  stroke: var(--rule);
+}
+
+.meter-tick {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.meter-needle {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transform-origin: 42px 46px;
+  transform: rotate(var(--angle));
+  animation: swing 1000ms var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 300ms);
+}
+
+.meter-pivot {
+  fill: var(--ink);
+}
+
+@keyframes swing {
+  from {
+    transform: rotate(var(--start));
+  }
+}
+
 /* Loading, empty, and error states */
 .state {
   padding: 56px 0;
@@ -520,25 +806,73 @@ code {
 .button {
   justify-self: start;
   padding: 8px 18px;
+  border: var(--border) solid var(--ink);
   border-radius: 999px;
-  border: 0;
   background: var(--ink);
   color: var(--paper);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  box-shadow: 3px 3px 0 var(--focus);
+  transition:
+    transform var(--dur) var(--ease-spring),
+    box-shadow var(--dur) var(--ease-spring);
 }
 
-/* The rule sits on the text, not the padded footer, so it lines up with the sections above. */
+.button:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: 5px 5px 0 var(--focus);
+}
+
+.button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--focus);
+}
+
+/* Skeletons: flat shapes where the numbers will land. They pulse instead of
+   shimmering, because a shimmer is a moving gradient. */
+.skeleton-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.skeleton {
+  display: block;
+  border-radius: 8px;
+  background: currentColor;
+  opacity: 0.14;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: calc(var(--text-hero) * 0.8);
+}
+
+.skeleton-line {
+  height: 1.1rem;
+  margin-top: 8px;
+}
+
+.skeleton-chart {
+  height: 340px;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.26;
+  }
+}
+
+/* The footer is a band too, so the page ends on the same thick line it is built from. */
+.band-footer {
+  border-top: var(--border-thick) solid var(--ink);
+}
+
 .footer {
+  padding-top: 20px;
   padding-bottom: 40px;
   color: var(--muted);
   font-size: 0.85rem;
-}
-
-.footer p {
-  border-top: 1px solid var(--rule);
-  padding-top: 16px;
 }
 
 .footer a {

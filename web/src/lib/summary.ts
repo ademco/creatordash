@@ -13,30 +13,52 @@ export interface OverviewNumbers {
   topPlatformGained: number;
 }
 
-function fans(count: number): string {
-  return `${formatNumber(count)} ${count === 1 ? 'fan' : 'fans'}`;
+/**
+ * The headline split around its lead number, so the page can count that number
+ * up while the words stay still. `before + formatNumber(count) + after` is the
+ * whole sentence; `count` is null when the sentence has no number in it.
+ */
+export interface HeadlineParts {
+  before: string;
+  count: number | null;
+  after: string;
 }
 
-export function headline(o: OverviewNumbers): string {
+function fanWord(count: number): string {
+  return count === 1 ? 'fan' : 'fans';
+}
+
+export function headlineParts(o: OverviewNumbers): HeadlineParts {
   const period = `in the last ${o.days} ${o.days === 1 ? 'day' : 'days'}`;
 
   if (o.gained > 0) {
-    const first = `You picked up ${fans(o.gained)} ${period}.`;
-    if (!o.topPlatform) return first;
-    const name = platformName(o.topPlatform);
-    const amount = formatSigned(o.topPlatformGained);
-    // "Most of them" is only true when the top platform brought more than half.
-    if (o.topPlatformGained * 2 > o.gained) return `${first} Most of them came from ${name} (${amount}).`;
-    return `${first} ${name} brought the most (${amount}).`;
+    let after = ` ${fanWord(o.gained)} ${period}.`;
+    if (o.topPlatform) {
+      const name = platformName(o.topPlatform);
+      const amount = formatSigned(o.topPlatformGained);
+      // "Most of them" is only true when the top platform brought more than half.
+      after +=
+        o.topPlatformGained * 2 > o.gained
+          ? ` Most of them came from ${name} (${amount}).`
+          : ` ${name} brought the most (${amount}).`;
+    }
+    return { before: 'You picked up ', count: o.gained, after };
   }
 
   if (o.gained < 0) {
-    const first = `Your audience is down ${fans(-o.gained)} ${period}.`;
-    if (!o.topPlatform) return first;
-    return `${first} ${platformName(o.topPlatform)} still grew (${formatSigned(o.topPlatformGained)}).`;
+    let after = ` ${fanWord(-o.gained)} ${period}.`;
+    if (o.topPlatform) {
+      after += ` ${platformName(o.topPlatform)} still grew (${formatSigned(o.topPlatformGained)}).`;
+    }
+    return { before: 'Your audience is down ', count: -o.gained, after };
   }
 
-  return `Your audience held steady ${period}.`;
+  return { before: `Your audience held steady ${period}.`, count: null, after: '' };
+}
+
+export function headline(o: OverviewNumbers): string {
+  const { before, count, after } = headlineParts(o);
+  return before + (count === null ? '' : formatNumber(count)) + after;
 }
 
 export function audienceLine(o: Pick<OverviewNumbers, 'combinedAudience'>, platformCount: number): string {

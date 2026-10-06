@@ -336,3 +336,37 @@ Fix: Send `@since` as a plain string and write `CAST(@since AS DATE)` in the SQL
 1. *How did you narrow it down?* Two answers from the same request disagreed: the newest date was right, the totals were zero. The only difference between those queries was the date parameter, so I checked what the client library actually sends for it.
 2. *Why did the tests not catch it?* They replaced the BigQuery client with a fake, which is right for testing SQL shape and row mapping but blind to how the library serializes parameters. I added one test at that boundary instead of mocking it away.
 3. *Why cast in SQL instead of using `BigQuery.date()`?* A string parameter plus an explicit `CAST` is the simplest form, the same in every client, and fails loudly with a clear error if the string is not a valid date.
+
+## Phase 9: Bold shell and motion
+
+### What was built
+
+The dashboard looks and moves differently; the data and API are unchanged.
+
+- **Bands, not boxes.** The page is full-width stripes separated by a thick ink line. The headline sits in a dark "stage" band (dark in both themes), with the made-up-data note as a tilted sticker.
+- **A rolling number.** The number in the headline counts up (`useCountUp` in `web/src/lib/countUp.ts`). `headlineParts()` in `summary.ts` splits the sentence around that number; `headline()` is built from it, so the old sentence tests still pass.
+- **Smooth window switching.** The new numbers swap in inside `document.startViewTransition`, so 30 / 90 / 180 days cross-fades. Browsers without it, and visitors who prefer reduced motion, get a plain cut. A slow load dims the old numbers after 250 ms.
+- **Spring motion with no library.** CSS `linear()` easing is a real damped spring (10% overshoot) that drives the needle swing, bar growth, and sticker hover.
+- **Breakouts as gauges.** Each row has a dial with a needle that swings to the multiple. The geometry is pure code in `lib/meter.ts` with tests; the text value stays for screen readers.
+- **Stickers and bars.** Platform chips tilt and lift on hover; share bars spring out of outlined tracks; skeleton shapes replace the plain loading text.
+- **Details.** Waveform logo and favicon, theme-color meta, text selection in the top platform's color.
+
+Checks: typecheck clean, 82 tests pass (23 web, 59 API), build green. Bundle grew about 2.5 kB gzipped (JS +1.2, CSS +1.3). Screenshots reviewed in light, dark, and 390px phone widths.
+
+### Key decisions and trade-offs
+
+- **No animation library.** CSS springs, view transitions, and one small `requestAnimationFrame` hook cover everything here, keeping the bundle small and every line explainable. If I later need layout animations between components, `motion` is the next step.
+- **Keyframes instead of `@starting-style`** for the entrance, because they work in more browsers.
+- **Boldness inside the rules.** Flat color, no gradients, no all-caps, left-aligned. Shadows are solid offset copies, and the skeleton pulses rather than shimmers (a shimmer is a gradient).
+- **Not verified here:** the Google Fonts request fails in this cloud sandbox (untrusted proxy certificate), so my screenshots used fallback fonts. Check the real typography in your browser.
+
+### Interview questions
+
+1. **How did you make the headline number count up without hurting accessibility?**
+   Screen readers get the final number in a visually hidden span at once. Sighted users see a live copy rolling up, plus an invisible copy that holds the final width so the words around it don't shift. With reduced motion on, it just shows the final value.
+
+2. **Why a view transition instead of animating the chart data?**
+   The browser snapshots the old and new page and cross-fades them, so one small change animates the whole content block, whatever it contains. It needs one feature check, with the plain swap as the fallback.
+
+3. **How do you do spring animations in plain CSS?**
+   `linear()` takes a list of points on a curve. I sampled a damped spring equation into 24 points, so the easing overshoots and settles. Browsers that don't support it fall back to normal easing.
