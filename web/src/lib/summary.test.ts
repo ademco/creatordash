@@ -36,7 +36,7 @@ describe('headline', () => {
 describe('audienceLine', () => {
   it('states the combined audience and that people can count twice', () => {
     expect(audienceLine(base, 5)).toBe(
-      '56,295 followers, subscribers, and monthly listeners across 5 platforms today. ' +
+      '56,295 fans across 5 platforms today. ' +
         'Someone who follows you in two places counts twice.',
     );
   });

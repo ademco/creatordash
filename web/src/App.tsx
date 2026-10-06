@@ -43,7 +43,7 @@ export function App() {
     const { overview, audienceGrowth, platformBreakdown, breakouts } = shown;
     body = (
       <div className={refreshing ? 'content is-refreshing' : 'content'} aria-busy={refreshing}>
-        <Headline overview={overview} platformCount={platformBreakdown.length} />
+        <Headline overview={overview} platformCount={platformBreakdown.length} sample={shown.dataInfo.sample} />
         <GrowthChart series={audienceGrowth} days={overview.days} />
         <div className="columns">
           <PlatformShares shares={platformBreakdown} days={overview.days} />
@@ -56,11 +56,6 @@ export function App() {
   return (
     <>
       <TopBar days={days} onDaysChange={setDays} />
-      {shown?.dataInfo.sample && (
-        <p className="sample-note" role="note">
-          Sample data: every number here is made up, so you can try the dashboard before connecting real stats.
-        </p>
-      )}
       <main id="main" className="page">
         {body}
       </main>
