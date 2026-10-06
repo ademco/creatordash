@@ -77,7 +77,7 @@ export function App() {
         <Headline overview={overview} platformCount={platformBreakdown.length} sample={shown.dataInfo.sample} />
         <div className="band" style={stagger(1)}>
           <div className="page band-inner">
-            <GrowthChart series={audienceGrowth} days={overview.days} />
+            <GrowthChart series={audienceGrowth} days={overview.days} breakouts={breakouts} />
           </div>
         </div>
         <div className="band band-raised" style={stagger(2)}>
