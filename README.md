@@ -8,7 +8,7 @@ A fan-insights dashboard for an independent music artist and creator (Regiwock).
 
 <sup>Shown with the built-in sample data. Every number is made up. A dark theme follows the system setting: [dark screenshot](docs/screenshot-dark.png).</sup>
 
-**Live demo:** not deployed yet. The infrastructure is ready; deploying takes one command after creating a Google Cloud project ([docs/DEPLOY.md](docs/DEPLOY.md)).
+**Live demo:** [fan-insights-gsv5wgokya-uc.a.run.app](https://fan-insights-gsv5wgokya-uc.a.run.app/?days=90), running on Google Cloud Run and reading the sample data from BigQuery. It scales to zero, so the first load after a quiet spell takes a second or two. To deploy your own, see [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## What it does
 
