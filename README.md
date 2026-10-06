@@ -1,99 +1,74 @@
-# Fan Insights Lite
+# Fan Insights
 
 [![CI](https://github.com/ademco/creatordash/actions/workflows/ci.yml/badge.svg)](https://github.com/ademco/creatordash/actions/workflows/ci.yml)
 
-A fan-insights dashboard for an independent music artist and creator (Regiwock). It answers three questions in plain language: **how is my audience growing** across Spotify, YouTube, Twitch, Kick, and TikTok, **where are my fans**, and **which releases, videos, or streams broke out**.
+I make music and stream as Regiwock. My audience is split across Spotify, YouTube, Twitch, Kick, and TikTok, and each platform has its own analytics page that answers a slightly different question. I wanted one page that tells me how I'm actually doing, so I built it.
 
-![The dashboard on sample data: a one-sentence headline, a growth chart with one line per platform, share bars, and a ranked list of breakouts](docs/screenshot.png)
+**Live:** [fan-insights-gsv5wgokya-uc.a.run.app](https://fan-insights-gsv5wgokya-uc.a.run.app/?days=90). It runs on sample data: the numbers are made up, the pipeline is real. The first load can take a second or two because the service scales to zero.
 
-<sup>Shown with the built-in sample data. Every number is made up. A dark theme follows the system setting: [dark screenshot](docs/screenshot-dark.png).</sup>
+![Dashboard showing a one-sentence summary, a growth chart per platform, audience share bars, and a list of posts that broke out](docs/screenshot.png)
 
-**Live demo:** [fan-insights-gsv5wgokya-uc.a.run.app](https://fan-insights-gsv5wgokya-uc.a.run.app/?days=90), running on Google Cloud Run and reading the sample data from BigQuery. It scales to zero, so the first load after a quiet spell takes a second or two. To deploy your own, see [docs/DEPLOY.md](docs/DEPLOY.md).
+[Dark mode](docs/screenshot-dark.png) follows your system setting.
 
-## What it does
+## What it shows
 
-- **A headline written from the data:** "You picked up 3,414 fans in the last 30 days. Most of them came from TikTok (+2,211)." It's honest about wording: it only says "most of them" when one platform really brought more than half.
-- **Growth chart** with one line per platform. Switch between *Growth* (gain since the start of the window, so a 1.6K-follower Kick and a 21K TikTok share one readable scale) and *Total*, and show or hide platforms.
-- **Where your fans are:** each platform's latest audience, its share, and its gain.
-- **What broke out:** content with at least 2.5× the **median** views for its platform. The median, not the mean, so one viral post doesn't hide the next one (or itself).
-- Windows of 30, 90, or 180 days, counted back from the newest date in the data, so old exports still work.
+The headline is a sentence written from the data, like "You picked up 11,041 fans in the last 90 days. Spotify brought the most (+4,755)." Under it: a growth chart with one line per platform, where each platform's audience is, and which posts broke out.
 
-## Architecture
+A post "broke out" if it got at least 2.5× the median views for its platform in that window. I use the median rather than the mean because a big hit inflates the mean and can hide itself, or the next hit. Platforms with fewer than three posts are skipped, since a median of two isn't worth much.
+
+Windows (30, 90, 180 days) count back from the newest date in the data, not from today, so an old export still shows a full picture.
+
+## How it works
 
 ```mermaid
 flowchart LR
-  subgraph Browser
-    UI["React 19 dashboard<br/>Apollo Client · Recharts"]
-  end
-  subgraph Container["One container (Cloud Run)"]
-    EX["Express 5"] --> AP["Apollo Server 5<br/>GraphQL schema + resolvers"]
-    AP --> IN["insights.ts<br/>pure, tested functions"]
-    AP --> DS{{"DataSource interface"}}
-    DS --> LOCAL["LocalDataSource<br/>CSV files"]
-    DS --> CACHE["CachedDataSource"] --> BQDS["BigQueryDataSource<br/>parameterized SQL"]
-  end
-  UI -- "POST /graphql (one query)" --> EX
-  EX -- "static files" --> UI
-  BQDS --> BQ[("BigQuery<br/>fan_insights.audience<br/>fan_insights.content")]
-  CSV["data/sample · data/real"] --> LOCAL
-  CSV -- "ingest/load_to_bigquery.py" --> BQ
-  TF["Terraform (infra/)"] -. creates .-> BQ
-  TF -. creates .-> Container
+  UI["React dashboard"] -- "one GraphQL query" --> API["Express + Apollo Server"]
+  API --> INS["insights.ts<br/>pure functions"]
+  API --> DS{{"DataSource"}}
+  DS --> CSV["CSV files<br/>(local dev)"]
+  DS --> BQ[("BigQuery<br/>(production)")]
+  TF["Terraform"] -. creates .-> BQ
+  TF -. creates .-> RUN["Cloud Run"]
 ```
 
-- **One GraphQL query** loads the whole page. The schema documents itself, with descriptions on every field, viewable in Apollo Sandbox at `/graphql`.
-- **The insight rules are pure functions** in `api/src/insights.ts`. Data sources only filter by date, so the CSV and BigQuery versions behave identically.
-- **In production**, the dashboard and API are one Express server in one container on Cloud Run (scale to zero). It reads BigQuery as a service account that can read one dataset and nothing else.
+The page makes one GraphQL query. The API keeps the rules in `api/src/insights.ts` as pure, tested functions, and reads rows through a small `DataSource` interface: CSV files on my laptop, BigQuery in production. Both return the same shapes, so the rules can't tell them apart.
 
-| Layer | Choice |
-|---|---|
-| Web | React 19, TypeScript 7, Vite 8, Apollo Client 4, Recharts 3 |
-| API | Node 22, Express 5, Apollo Server 5, GraphQL |
-| Data | CSV locally; BigQuery in the cloud (`@google-cloud/bigquery`) |
-| Tests | Vitest (55 API + 10 web), Python `unittest` (7) |
-| Infra | Docker (multi-stage), Terraform, Cloud Run v2, Artifact Registry, BigQuery |
-| CI | GitHub Actions: typecheck, tests, build, `terraform validate`, Docker build |
+In production it's a single container on Cloud Run that serves both the API and the built React app. It reads BigQuery as a service account that can see one dataset and nothing else. Everything in Google Cloud is defined in Terraform under `infra/`, and GitHub Actions runs typecheck, tests, build, `terraform validate`, and a Docker build on every push.
+
+Stack: React 19, TypeScript, Vite, Apollo Client and Server, Recharts, Express 5, BigQuery, Terraform, Docker, Cloud Run, Vitest.
 
 ## Run it
 
-You need Node 22 (`nvm use` reads `.nvmrc`) and Python 3 for the ingest tests.
+Needs Node 22 (`nvm use`).
 
 ```bash
 npm install
-npm run dev          # dashboard: http://localhost:5173   API + Apollo Sandbox: http://localhost:4000/graphql
+npm run dev
 ```
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | API and dashboard together, on the made-up sample data |
-| `npm run dev:real` | Same, on your real numbers in `data/real/` ([docs/REAL_DATA.md](docs/REAL_DATA.md)) |
-| `npm test` | All tests (TypeScript and Python) |
-| `npm run typecheck` / `npm run build` | Type-check / production build |
-| `npm run sample-data` | Regenerate the deterministic sample data |
-| `npm run docker:build` then `npm run docker:run` | The production image at http://localhost:8080 |
-| `scripts/deploy.sh PROJECT_ID` | Deploy to Google Cloud ([docs/DEPLOY.md](docs/DEPLOY.md)) |
+The dashboard is at http://localhost:5173 and Apollo Sandbox at http://localhost:4000/graphql. Other commands:
 
-## Repository tour
-
-```
-api/             GraphQL API (TypeScript): csv.ts, rows.ts, insights.ts, data sources, schema, resolvers
-web/             React dashboard: App.tsx, components/, lib/ (headline wording, formatting, axis ticks)
-data/sample/     Made-up data (180 days, 6 planned breakouts). See its README
-data/templates/  Starting point for your real numbers
-ingest/          Python: fan_data.py (check + upsert), load_to_bigquery.py
-infra/           Terraform for Google Cloud
-scripts/         Sample-data generator, deploy script
-docs/            BUILD_LOG.md (how and why it was built), DEPLOY.md, REAL_DATA.md
+```bash
+npm test                                   # TypeScript and Python tests
+npm run typecheck && npm run build
+npm run dev:real                           # use your own numbers from data/real/
+npm run docker:build && npm run docker:run # production image on :8080
+scripts/deploy.sh PROJECT_ID               # deploy to Google Cloud
+npm run load-bq -- PROJECT_ID              # load CSVs into BigQuery
 ```
 
-## What I would build next
+[docs/REAL_DATA.md](docs/REAL_DATA.md) covers the CSV format and where to export each platform's numbers. [docs/DEPLOY.md](docs/DEPLOY.md) covers Google Cloud from an empty account.
 
-1. **Release impact.** For each release, the audience change on every platform in the 7 days after it, compared with the 7 days before. It answers "did that drop actually move anything?" and is a natural BigQuery window-function query.
-2. **Daily refresh.** A scheduled Cloud Run job that pulls numbers from the platforms that have APIs (YouTube Analytics, Twitch) and `MERGE`s them into BigQuery, so the dashboard stays current without manual exports.
-3. **A&R view.** Compare several artists' growth on one indexed scale (each artist = 100 at the start of the window). Before building it, I'd check exactly what the Spotify Web API currently allows, because access for new apps has been narrowed.
-4. **Continuous deployment.** Deploy from GitHub Actions on merge to `main`, authenticated with Workload Identity Federation (no stored keys), with Terraform state in a shared GCS bucket.
-5. **Generated GraphQL types.** Use GraphQL Code Generator so the API's resolvers and the web app's query types come from the schema instead of being written by hand.
+## One bug worth mentioning
 
-## How it was built
+After the first deploy the live site showed zeros even though BigQuery had all the rows. The cause: the BigQuery Node client silently drops a plain string passed as a `DATE` parameter, so `WHERE date >= @since` became `date >= NULL` and matched nothing. No error, just an empty page. The tests missed it because they used a fake query runner. The fix casts in SQL, and a new test runs the client library's real parameter code. The full story is in the [build log](docs/BUILD_LOG.md#fix-live-dashboard-empty-after-loading-bigquery).
 
-Built in phases with an AI pair programmer (Claude Code), one pull request per phase. [docs/BUILD_LOG.md](docs/BUILD_LOG.md) records what was built in each phase, the decisions and trade-offs, and the questions I'd expect in an interview.
+## What I'd build next
+
+- **Release impact.** For each release, the audience change in the week after versus the week before. It answers "did that drop move anything?" and is a natural window-function query in BigQuery.
+- **Daily refresh.** A scheduled job that pulls from the platforms with APIs (YouTube, Twitch) and merges into BigQuery, so I stop exporting CSVs by hand.
+- **Deploy on merge.** GitHub Actions deploying with Workload Identity Federation instead of stored keys, and Terraform state in a shared bucket.
+
+## How I built it
+
+I built this with Claude Code as a pair programmer, one phase and one pull request at a time, against a written spec ([CLAUDE.md](CLAUDE.md)). I reviewed each change before merging it, and kept a [build log](docs/BUILD_LOG.md) of what each phase did and why.

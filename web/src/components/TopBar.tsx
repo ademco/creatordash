@@ -14,7 +14,7 @@ export function TopBar({ days, onDaysChange }: Props) {
           Skip to the numbers
         </a>
         <p className="brand">
-          Fan Insights <span className="brand-artist">for Regiwock</span>
+          Regiwock <span className="brand-sub">fan insights</span>
         </p>
         <fieldset className="window-picker">
           <legend className="visually-hidden">Time window</legend>
