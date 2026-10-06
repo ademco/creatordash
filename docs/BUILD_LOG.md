@@ -370,3 +370,40 @@ Checks: typecheck clean, 82 tests pass (23 web, 59 API), build green. Bundle gre
 
 3. **How do you do spring animations in plain CSS?**
    `linear()` takes a list of points on a curve. I sampled a damped spring equation into 24 points, so the easing overshoots and settles. Browsers that don't support it fall back to normal easing.
+
+## Phase 10: The waveform
+
+### What was built
+
+The growth section now opens on a **waveform**: every day of the window is a bar, drawn like an audio track. Fans gained stack upward from a center line in platform colors; fans lost stack downward. The toggle is now Waveform / Lines / Total, and the platform chips filter all three.
+
+- **Scrub it.** A mouse scrubs by hovering. Touch and pen scrub while pressed, with `touch-action: pan-y` so a vertical swipe still scrolls the page. The bright part of the bars is "played", the faded part is still to come.
+- **Keyboard.** The waveform is `role="slider"`: arrows move a day, PageUp/PageDown a week, Home/End jump to the ends. `aria-valuetext` reads like "Sep 30, 2026: +31 fans that day, +11,041 so far".
+- **Play.** One button sweeps the playhead across the window in 8 seconds, easing in and out. It is not shown when the visitor prefers reduced motion.
+- **Pins.** Each breakout is a dot above the waveform at its publish date, like a SoundCloud timed comment. Hover or focus shows "7.1× · title"; click jumps the playhead there. Labels anchor to the edge near the page edges.
+- **Readout.** Under the chart: fans gained so far, and each platform's gain on the chosen day. At the end of the window it equals the headline number (+11,041), which I checked in the browser.
+- The table under the chart is still there, so the numbers do not depend on the picture.
+
+The logic is in `web/src/lib/waveform.ts` (pure, 15 tests): `dailyGains`, `stackDay`, `layoutWave`, `playbackIndex`, `indexForDate`, `peakDay`, `totalThrough`. The component is `web/src/components/Waveform.tsx`.
+
+Checks: typecheck clean, 97 tests pass (38 web, 59 API), build green. Bundle grew about 2.6 kB gzipped. No API changes and no new dependencies.
+
+### Key decisions and trade-offs
+
+- **Custom SVG, not Recharts.** Recharts has no mirrored, stacked bar with a playhead. About 850 rectangles is cheap, and the bars are drawn twice (faded and bright) while only one clip rectangle moves, so scrubbing does not redraw them.
+- **One scale for both halves,** so a 100-fan gain and a 100-fan loss are the same height. The cost is that big losses would shrink the gains. In this data losses are small.
+- **Linear height.** The biggest day fills its half, so breakout days spike. That is the point, but one huge day makes quiet days small (they stay at least 1 unit tall).
+- **Gains are day over day.** If a platform skips a day, its change lands on the next day it has a point. The first day of a window has no bar, so 90 days give 89 bars.
+- **Hover scrubs for mouse only,** so touch users never move the playhead by accident while scrolling.
+- Pins are real buttons outside the slider, since interactive elements cannot nest inside one.
+
+### Interview questions
+
+1. **How do you keep scrubbing smooth with hundreds of bars?**
+   The bars are drawn once and memoized. A faded copy sits under a bright copy, and the bright copy is clipped by one rectangle whose width follows the playhead. Moving the playhead changes one attribute instead of redrawing 850 shapes.
+
+2. **How did you make it work without a mouse or sight?**
+   It is a slider with arrow, page, and home/end keys, and `aria-valuetext` says the date and numbers in words. Pins are buttons with full labels. The same numbers are in a table, and the play button is hidden for visitors who prefer reduced motion.
+
+3. **Why custom SVG instead of a chart library?**
+   The library gives lines and plain bars, not a mirrored stacked waveform with a playhead and pins. Drawing it myself took about 100 lines, and the geometry is pure functions I could unit test, such as "gains go above the center line" and "one scale for both halves".

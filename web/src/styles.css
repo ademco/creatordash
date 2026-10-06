@@ -880,6 +880,233 @@ code {
   text-underline-offset: 2px;
 }
 
+/* The waveform. Bars are SVG stretched to the width of the page; the playhead
+   and pins are HTML laid over it by percentage, so they stay lined up. */
+.wave-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+}
+
+.play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 18px;
+  border: var(--border) solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--top-platform);
+  transition:
+    transform var(--dur) var(--ease-spring),
+    box-shadow var(--dur) var(--ease-spring);
+}
+
+.play:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: 5px 5px 0 var(--top-platform);
+}
+
+.play:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--top-platform);
+}
+
+.wave-peak {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Breakouts pinned above the waveform at their publish date. The label shows on
+   hover or keyboard focus. */
+.wave-pins {
+  position: relative;
+  height: 56px;
+}
+
+.pin {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  padding: 5px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.pin-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: var(--border) solid var(--ink);
+  background: var(--pin);
+  transition: transform var(--dur) var(--ease-spring);
+}
+
+.pin:hover .pin-dot,
+.pin:focus-visible .pin-dot {
+  transform: scale(1.45);
+}
+
+.pin-label {
+  position: absolute;
+  z-index: 2;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 260px;
+  overflow: hidden;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) ease;
+}
+
+.pin:hover .pin-label,
+.pin:focus-visible .pin-label {
+  opacity: 1;
+}
+
+/* Near the edges, anchor the label to that edge so it never runs off the page. */
+.pin-start .pin-label {
+  left: 0;
+  transform: none;
+}
+
+.pin-end .pin-label {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* touch-action: pan-y lets a vertical swipe scroll the page; sideways drags scrub. */
+.wave-stage {
+  position: relative;
+  height: 260px;
+  cursor: ew-resize;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+@media (max-width: 600px) {
+  .wave-stage {
+    height: 200px;
+  }
+}
+
+.wave-stage svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The days still to come are faded; the played part is full color. */
+.wave-ahead {
+  opacity: 0.3;
+}
+
+.wave-base {
+  stroke: var(--ink);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.wave-playhead {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--ink);
+  pointer-events: none;
+}
+
+.wave-playhead::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.wave-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.wave-readout {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.wave-total {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.wave-total strong {
+  font-size: 1.875rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wave-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.wave-platforms li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wave-platforms strong {
+  display: inline-block;
+  min-width: 3.4em;
+  font-variant-numeric: tabular-nums;
+}
+
+.wave-platforms .is-quiet {
+  color: var(--muted);
+}
+
+.wave-key {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

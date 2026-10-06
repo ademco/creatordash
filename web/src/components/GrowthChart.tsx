@@ -14,13 +14,16 @@ import { formatCompact, formatLongDate, formatNumber, formatShortDate, formatSig
 import { PLATFORM_IDS, platformName } from '../lib/platforms';
 import { axisFor } from '../lib/ticks';
 import { usePrefersReducedMotion, useThemeColors } from '../lib/useThemeColors';
+import { Waveform } from './Waveform';
 
 interface Series {
   platform: string;
   points: { date: string; audience: number }[];
 }
 
-type Mode = 'growth' | 'total';
+type Mode = 'waveform' | 'lines' | 'total';
+/** What the line chart plots: gain since the start of the window, or the raw audience. */
+type LineMode = 'growth' | 'total';
 type Row = { date: string } & Record<string, number | string>;
 
 /**
@@ -28,7 +31,7 @@ type Row = { date: string } & Record<string, number | string>;
  * In "growth" mode each value is the gain since the first day of the window,
  * so platforms of very different sizes share one readable scale.
  */
-export function toChartRows(series: Series[], mode: Mode): Row[] {
+export function toChartRows(series: Series[], mode: LineMode): Row[] {
   const byDate = new Map<string, Row>();
   for (const { platform, points } of series) {
     const start = points[0]?.audience ?? 0;
@@ -44,20 +47,22 @@ export function toChartRows(series: Series[], mode: Mode): Row[] {
 interface Props {
   series: Series[];
   days: number;
+  breakouts: { title: string; platform: string; publishedDate: string; multiple: number }[];
 }
 
-export function GrowthChart({ series, days }: Props) {
-  const [mode, setMode] = useState<Mode>('growth');
+export function GrowthChart({ series, days, breakouts }: Props) {
+  const [mode, setMode] = useState<Mode>('waveform');
+  const growth = mode !== 'total';
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const colors = useThemeColors();
   const reducedMotion = usePrefersReducedMotion();
 
-  const rows = useMemo(() => toChartRows(series, mode), [series, mode]);
+  const rows = useMemo(() => toChartRows(series, growth ? 'growth' : 'total'), [series, growth]);
   // Chips follow the fixed platform order, so colors and positions never shuffle.
   const platforms = PLATFORM_IDS.filter((id) => series.some((s) => s.platform === id));
   const visible = platforms.filter((id) => !hidden.has(id));
   const axis = useMemo(
-    () => axisFor(rows.flatMap((row) => visible.map((id) => Number(row[id] ?? 0))), mode === 'growth'),
+    () => axisFor(rows.flatMap((row) => visible.map((id) => Number(row[id] ?? 0))), growth),
     // `visible` is rebuilt every render, so depend on its contents instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, visible.join()],
@@ -71,15 +76,18 @@ export function GrowthChart({ series, days }: Props) {
       return next;
     });
 
-  const formatValue = (value: number) => (mode === 'growth' ? formatSigned(value) : formatNumber(value));
+  const formatValue = (value: number) => (growth ? formatSigned(value) : formatNumber(value));
 
   return (
     <section className="section" aria-labelledby="growth-title">
       <div className="section-head">
         <h2 id="growth-title">How your audience grew</h2>
         <div className="segmented" role="group" aria-label="Show">
-          <button type="button" aria-pressed={mode === 'growth'} onClick={() => setMode('growth')}>
-            Growth
+          <button type="button" aria-pressed={mode === 'waveform'} onClick={() => setMode('waveform')}>
+            Waveform
+          </button>
+          <button type="button" aria-pressed={mode === 'lines'} onClick={() => setMode('lines')}>
+            Lines
           </button>
           <button type="button" aria-pressed={mode === 'total'} onClick={() => setMode('total')}>
             Total
@@ -87,9 +95,11 @@ export function GrowthChart({ series, days }: Props) {
         </div>
       </div>
       <p className="section-note">
-        {mode === 'growth'
-          ? `Fans gained per platform over the last ${days} days.`
-          : 'Followers, subscribers, and monthly listeners per platform.'}
+        {mode === 'waveform'
+          ? `Each bar is one day of the last ${days}: fans gained above the line, lost below it. Move across it, or press play.`
+          : mode === 'lines'
+            ? `Fans gained per platform over the last ${days} days.`
+            : 'Followers, subscribers, and monthly listeners per platform.'}
       </p>
 
       <div className="chips" role="group" aria-label="Platforms on the chart">
@@ -112,6 +122,11 @@ export function GrowthChart({ series, days }: Props) {
       <div className="chart">
         {visible.length === 0 ? (
           <p className="chart-empty">Turn on a platform above to see its line.</p>
+        ) : mode === 'waveform' ? (
+          <Waveform
+            series={series.filter((s) => !hidden.has(s.platform))}
+            pins={breakouts.filter((b) => !hidden.has(b.platform))}
+          />
         ) : (
           <ResponsiveContainer width="100%" height={340}>
             <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
@@ -125,7 +140,7 @@ export function GrowthChart({ series, days }: Props) {
                 minTickGap={32}
               />
               <YAxis
-                tickFormatter={(value: number) => formatCompact(value, mode === 'growth')}
+                tickFormatter={(value: number) => formatCompact(value, growth)}
                 stroke={colors.rule}
                 tick={{ fill: colors.muted, fontSize: 12 }}
                 tickLine={false}
