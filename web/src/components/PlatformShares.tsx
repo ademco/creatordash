@@ -16,7 +16,7 @@ export function PlatformShares({ shares, days }: { shares: Share[]; days: number
   return (
     <section className="section" aria-labelledby="shares-title">
       <h2 id="shares-title">Where your fans are</h2>
-      <p className="section-note">Today's audience on each platform, and the change over the last {days} days.</p>
+      <p className="section-note">Audience today, and the change over {days} days.</p>
       <ul className="shares">
         {shares.map(({ platform, audience, share, gained }) => (
           <li key={platform} className="share">

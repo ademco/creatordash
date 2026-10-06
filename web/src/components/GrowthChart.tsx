@@ -88,8 +88,8 @@ export function GrowthChart({ series, days }: Props) {
       </div>
       <p className="section-note">
         {mode === 'growth'
-          ? `Fans gained on each platform since the start of the last ${days} days.`
-          : 'Total followers, subscribers, or monthly listeners on each platform.'}
+          ? `Fans gained per platform over the last ${days} days.`
+          : 'Followers, subscribers, and monthly listeners per platform.'}
       </p>
 
       <div className="chips" role="group" aria-label="Platforms on the chart">
@@ -161,7 +161,7 @@ export function GrowthChart({ series, days }: Props) {
       </div>
 
       <details className="table-view">
-        <summary>See these numbers as a table</summary>
+        <summary>Show as a table</summary>
         <GrowthTable series={series} />
       </details>
     </section>

@@ -60,11 +60,14 @@ export function App() {
         {body}
       </main>
       <footer className="page footer">
-        {shown?.dataInfo.newestDate ? (
-          <p>
-            Numbers up to {formatLongDate(shown.dataInfo.newestDate)}, from {shown.dataInfo.source}.
-          </p>
-        ) : null}
+        <p>
+          {shown?.dataInfo.newestDate && (
+            <>
+              Numbers up to {formatLongDate(shown.dataInfo.newestDate)}, from {shown.dataInfo.source}.{' '}
+            </>
+          )}
+          Built by Adem. <a href="https://github.com/ademco/creatordash">Source on GitHub</a>.
+        </p>
       </footer>
     </>
   );

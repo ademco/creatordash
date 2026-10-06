@@ -1,51 +1,44 @@
 # Deploying to Google Cloud
 
-This puts the dashboard on a public URL, with the data in BigQuery. Everything except steps 2 and 3 (and the gcloud login prompts in step 4) is automated by Terraform and `scripts/deploy.sh`.
+This puts the dashboard on a public URL with its data in BigQuery. Terraform and `scripts/deploy.sh` do almost all of it. The only manual parts are creating the project, linking billing, and logging in.
 
-**What it costs:** at portfolio traffic it should be $0, but it needs a billing account. Everything used here has a monthly free tier:
-- Cloud Run scales to zero, so you pay nothing while nobody is looking.
-- BigQuery's first 1 TB of queries per month is free; these tables are a few KB.
-- Artifact Registry's first 0.5 GB of storage is free, and old images are cleaned up automatically.
-
-The budget alert in step 3 tells you if that ever stops being true.
+At portfolio traffic it costs nothing, because everything here sits inside a free tier: Cloud Run scales to zero, the BigQuery tables are a few KB, and old images are cleaned up automatically. You still need a billing account, so set the budget alert in step 3 anyway.
 
 ```mermaid
 flowchart LR
-  you[Your Mac] -- docker push --> ar[Artifact Registry]
-  you -- terraform apply --> gcp[(Google Cloud)]
-  you -- load_to_bigquery.py --> bq[(BigQuery: fan_insights)]
-  ar --> run[Cloud Run: fan-insights]
-  browser[Visitor] --> run
-  run -- SQL as fan-insights-run --> bq
+  mac[Laptop] -- docker push --> ar[Artifact Registry]
+  mac -- terraform apply --> gcp[(Google Cloud)]
+  mac -- npm run load-bq --> bq[(BigQuery)]
+  ar --> run[Cloud Run]
+  visitor[Visitor] --> run
+  run -- SQL, read-only --> bq
 ```
 
-## 1. Install the tools (once)
+## 1. Install the tools
 
 ```bash
-brew install --cask google-cloud-sdk   # gcloud
-brew install terraform                 # or: brew tap hashicorp/tap && brew install hashicorp/tap/terraform
-brew install --cask docker             # Docker Desktop; open it once so the engine starts
-python3 -m pip install -r ingest/requirements.txt
+brew install --cask google-cloud-sdk   # gcloud and bq
+brew install terraform
+brew install --cask docker             # open Docker Desktop once so the engine starts
 ```
 
-## 2. Create a project and link billing (once, in the browser)
+## 2. Create a project and link billing
 
-1. Go to https://console.cloud.google.com/projectcreate and create a project, for example `fan-insights`. Google adds a number to make the ID unique (for example `fan-insights-482913`). **Copy the project ID**; every command below needs it.
-2. Go to https://console.cloud.google.com/billing and link the project to a billing account. New accounts usually get free trial credit.
+Create a project at https://console.cloud.google.com/projectcreate. Google appends a number to make the ID unique, like `fan-insights-482913`. Every command below needs that ID.
 
-## 3. Set a budget alert (once, before deploying anything)
+Then link it to a billing account at https://console.cloud.google.com/billing.
 
-1. Go to https://console.cloud.google.com/billing/budgets and click **Create budget**.
-2. Scope: your fan-insights project. Amount: **$5**.
-3. Alert thresholds: 50%, 90%, and 100%. Keep "Email alerts to billing admins" on.
+## 3. Set a budget alert
 
-A budget only *alerts*; it doesn't stop spending. With scale-to-zero and `max_instances = 2`, a surprise bill is very unlikely, but this is how you'd find out.
+At https://console.cloud.google.com/billing/budgets, create a $5 budget for the project with alerts at 50%, 90%, and 100%.
 
-## 4. Log in (once per machine)
+A budget only sends email; it doesn't stop spending. With scale-to-zero and at most two instances a surprise bill is unlikely, but this is how you'd hear about one.
+
+## 4. Log in
 
 ```bash
-gcloud auth login                         # for gcloud and docker push
-gcloud auth application-default login     # for Terraform and the Python loader
+gcloud auth login
+gcloud auth application-default login     # Terraform uses this one
 gcloud config set project YOUR_PROJECT_ID
 ```
 
@@ -55,60 +48,49 @@ gcloud config set project YOUR_PROJECT_ID
 scripts/deploy.sh YOUR_PROJECT_ID
 ```
 
-The script will:
-1. `terraform init`: downloads the Google provider.
-2. Turn on the APIs and create the image registry. Terraform shows a plan; type `yes`.
-3. Build the image for `linux/amd64` and push it.
-4. Create everything else: the BigQuery dataset and tables, the service account and its two permissions, and the Cloud Run service. Again it shows a plan; type `yes`.
+It runs `terraform init`, then creates the APIs and the image registry, builds and pushes a `linux/amd64` image, and creates the rest: BigQuery dataset and tables, a service account, and the Cloud Run service. Terraform stops twice to show its plan. Read it, then type `yes`. The first run takes a few minutes, mostly enabling APIs, and prints the URL at the end.
 
-It prints the URL at the end. The first deploy takes a few minutes, mostly enabling APIs.
-
-## 6. Load data into BigQuery
-
-```bash
-python3 ingest/load_to_bigquery.py --project YOUR_PROJECT_ID --data data/sample
-```
-
-No working Python? This does the same with only `gcloud`, `bq`, and Node: it checks and cleans the files, loads them, counts the rows, and waits until the live page shows the numbers:
+## 6. Load data
 
 ```bash
 npm run load-bq -- YOUR_PROJECT_ID              # sample data
-npm run load-bq -- YOUR_PROJECT_ID data/real    # your real numbers
+npm run load-bq -- YOUR_PROJECT_ID data/real    # your own numbers
 ```
 
-Refresh the URL. The page now reads from BigQuery: the footer says "from BigQuery dataset ...". To show your real numbers instead, load them and redeploy with the sample-data note turned off:
+This checks and cleans both CSVs with the API's own parser, loads them, compares row counts, and waits until the live page shows the numbers. It needs only `gcloud`, `bq`, and Node. (`ingest/load_to_bigquery.py` does the same in Python.)
+
+Once you load real numbers, turn off the sample-data label:
 
 ```bash
-python3 ingest/load_to_bigquery.py --project YOUR_PROJECT_ID --data data/real
 SAMPLE_DATA=false scripts/deploy.sh YOUR_PROJECT_ID
 ```
 
 ## Updating
 
-Change code, commit, run `scripts/deploy.sh YOUR_PROJECT_ID` again. Each image is tagged with its git commit, so you can always tell which code is live. To refresh the data, re-run the loader; the API caches answers for 5 minutes.
+Commit, then run `scripts/deploy.sh YOUR_PROJECT_ID` again. Images are tagged with the git commit, so you can always tell which code is live. A `-dirty` suffix means the image was built with uncommitted changes. The API caches answers for 5 minutes, so new data can take that long to appear.
 
-## Tearing it all down
+## Tearing it down
 
 ```bash
 terraform -chdir=infra destroy -var project_id=YOUR_PROJECT_ID
 ```
 
-This deletes everything Terraform created, including the BigQuery data. Or delete the whole project in the console.
+That deletes everything Terraform created, data included. Deleting the whole project in the console also works.
 
-## Terraform in five minutes
+## Terraform, briefly
 
-- **Declarative:** `infra/*.tf` describes what should exist, not the steps to create it. Terraform works out the steps.
-- **`terraform plan`** compares the `.tf` files with what exists and prints what it *would* change: `+` create, `~` update, `-` destroy. It changes nothing, so it's always safe to run.
-- **`terraform apply`** makes the same plan, shows it, and only acts after you type `yes`. Read the plan every time. A surprise `-` (destroy) is the thing to catch.
-- **State** (`infra/terraform.tfstate`) is Terraform's record of which real resources it manages and their IDs. It's how Terraform knows that "the BigQuery dataset" in the code is *that* dataset in the cloud. It's git-ignored because it can contain sensitive values. Lose it and Terraform forgets what it created (the resources keep running). A team would keep state in a Cloud Storage bucket so everyone shares one copy, with locking so two applies can't run at once.
-- **Why `-target` in the deploy script:** Cloud Run can't be created until an image exists, and the image can't be pushed until the registry exists. Targeting the registry first breaks that loop. It's the one place `-target` is normal; day to day you apply everything.
+`infra/*.tf` describes what should exist; Terraform works out how to get there. `terraform plan` shows what it would change (`+` create, `~` update, `-` destroy) and changes nothing. `terraform apply` shows the same plan and acts only after you type `yes`. An unexpected `-` is the thing to catch.
 
-## If something goes wrong
+State (`infra/terraform.tfstate`) is Terraform's record of which real resources it manages. It's git-ignored because it can hold sensitive values. Lose it and Terraform forgets what it made, though the resources keep running. A team would keep it in a Cloud Storage bucket with locking.
 
-| Symptom | Likely cause and fix |
+The deploy script uses `-target` once, on purpose: Cloud Run needs an image, and the image needs a registry, so the registry is created first.
+
+## When something breaks
+
+| What you see | What to do |
 |---|---|
-| `Error 403: ... API has not been used in project` | An API is still switching on. Wait a minute and re-run the script. |
-| Page says "Couldn't load your numbers" | Open Cloud Run → fan-insights → Logs. `Access Denied` on BigQuery means the IAM grants are still propagating (wait a minute). `Not found: Table` means step 6 hasn't run yet. |
-| Page shows "No numbers yet" | The tables are empty. Run step 6. |
-| `exec format error` in the Cloud Run logs | The image was built for ARM. The script always passes `--platform linux/amd64`; don't build it without that. |
-| `allUsers` can't be added | Some Google Workspace organizations block public services. A personal project (no organization) allows it. |
+| `Error 403: ... API has not been used in project` | An API is still turning on. Wait a minute and run the script again. |
+| "Couldn't load your numbers" | Check Cloud Run → fan-insights → Logs. `Access Denied` means permissions are still propagating; wait a minute. `Not found: Table` means step 6 hasn't run. |
+| "No numbers yet" | The tables are empty. Run step 6. |
+| `exec format error` in the logs | The image was built for ARM. Use the script, which always builds `linux/amd64`. |
+| Can't add `allUsers` | Some Google Workspace organizations block public services. A personal project works. |

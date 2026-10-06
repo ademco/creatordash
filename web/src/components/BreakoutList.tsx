@@ -16,7 +16,7 @@ export function BreakoutList({ breakouts, days }: { breakouts: Breakout[]; days:
   return (
     <section className="section" aria-labelledby="breakouts-title">
       <h2 id="breakouts-title">What broke out</h2>
-      <p className="section-note">Anything with at least 2.5 times the usual views for its platform.</p>
+      <p className="section-note">At least 2.5× the usual views for that platform.</p>
       {breakouts.length === 0 ? (
         <p className="empty-note">
           Nothing broke out in the last {days} days. Try a longer window to look further back.

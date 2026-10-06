@@ -38,7 +38,7 @@ published_date,platform,content_type,title,views
 - `title`: if it contains a comma, wrap it in double quotes. A quote inside a title is written twice: `"Fan duet: ""Glass Houses"""`. Spreadsheet apps do this for you when you save as CSV.
 - `views`: streams for releases, views for videos and shorts, peak viewers for streams
 
-**Make views comparable.** Breakouts compare each post with the median for its platform. If old videos have had years to collect views and new ones only days, the old ones will look like hits. Use the same measuring period for everything when the platform offers one, for example views in the first 7 or 28 days.
+Make views comparable. Breakouts compare each post with the median for its platform. If old videos have had years to collect views and new ones only days, the old ones will look like hits. Use the same measuring period for everything when the platform offers one, for example views in the first 7 or 28 days.
 
 ## Where to get the numbers
 

@@ -1,6 +1,6 @@
 # Build log
 
-What was built in each phase, why, and likely interview questions.
+My notes from building this, one phase at a time: what went in, why, what I traded off, and the questions I'd expect about it in an interview.
 
 ## Phase 0: Setup
 
@@ -17,10 +17,10 @@ Tool check: Node 22.22.0, npm 10.9.4, git 2.43.0. Nothing needed installing. The
 
 ### Key decisions and trade-offs
 
-- **npm workspaces instead of Turborepo, Nx, or pnpm.** npm ships with Node, so there's nothing extra to install or explain. A two-package repo doesn't need build caching or task graphs. If the repo grew to many packages, Turborepo's caching would start to pay off.
-- **One repo for API and web instead of two.** The schema and the dashboard change together, so one commit can update both, and one Docker image can ship both. The cost is that API and web can't be released on separate schedules, which this project doesn't need.
-- **`main` plus one pull request per phase.** `main` stays green, and each later phase arrives as a reviewable PR that gets squash-merged. Once CI exists (Phase 7) it runs on every PR, and the PR list doubles as a readable history of how the project was built. Pushing straight to `main` would be faster but leaves no review step and no per-phase record.
-- **Placeholder workspace packages now.** npm expects each listed workspace folder to hold a `package.json`. Tiny placeholders keep `npm install` clean until the real packages exist.
+- npm workspaces instead of Turborepo, Nx, or pnpm. npm ships with Node, so there's nothing extra to install or explain. A two-package repo doesn't need build caching or task graphs. If the repo grew to many packages, Turborepo's caching would start to pay off.
+- One repo for API and web instead of two. The schema and the dashboard change together, so one commit can update both, and one Docker image can ship both. The cost is that API and web can't be released on separate schedules, which this project doesn't need.
+- `main` plus one pull request per phase. `main` stays green, and each later phase arrives as a reviewable PR that gets squash-merged. Once CI exists (Phase 7) it runs on every PR, and the PR list doubles as a readable history of how the project was built. Pushing straight to `main` would be faster but leaves no review step and no per-phase record.
+- Placeholder workspace packages now. npm expects each listed workspace folder to hold a `package.json`. Tiny placeholders keep `npm install` clean until the real packages exist.
 
 ### Interview questions
 
@@ -40,16 +40,16 @@ Tool check: Node 22.22.0, npm 10.9.4, git 2.43.0. Nothing needed installing. The
 - `scripts/generate-sample-data.mjs` (run with `npm run sample-data`) writes two made-up CSV files:
   - `data/sample/audience.csv`: 180 days × 5 platforms, 900 rows. Each platform has its own starting size, daily growth, and day-to-day wobble. Spotify monthly listeners wobble the most because, unlike followers, they can go down.
   - `data/sample/content.csv`: 212 releases, videos, streams, and shorts on a realistic schedule. Releases go out every 18 days, YouTube videos weekly, Twitch streams every 3 days, Kick streams weekly, and TikTok shorts every other day.
-- **Six planned breakouts** get 4 to 7.5 times the usual views. Each one adds a wave of new followers that fades over about a week, so the growth lines bend after it. Some spill over to another platform: a viral TikTok also brings Spotify listeners.
+- Six planned breakouts get 4 to 7.5 times the usual views. Each one adds a wave of new followers that fades over about a week, so the growth lines bend after it. Some spill over to another platform: a viral TikTok also brings Spotify listeners.
 - `data/sample/README.md` says up front that every number is fake. It lists the breakouts and what the dashboard should show for each window, which gives Phase 2 and 3 a known answer to check against.
 
 ### Key decisions and trade-offs
 
-- **Deterministic output.** `Math.random()` can't be seeded, so the script uses mulberry32, a tiny seeded generator, plus a fixed end date (2026-09-30) instead of "today". Every run writes byte-identical files. I confirmed this by running the script twice and comparing checksums. Tests and screenshots built on this data won't drift. The cost is that the sample data never looks "current", which is fine because the app counts windows back from the newest date in the data.
-- **Data designed to test the insight rules.** Normal posts are capped at 1.8× usual views, and breakouts sit well above the 2.5× line. Spotify has only one release in the last 30 days, which exercises the "skip platforms with fewer than 3 items" rule. Titles include commas and quotes (`Cold Coffee, Warm Hands`, `Fan duet: "Glass Houses", acoustic`) to exercise CSV quoting. A different parser (Python's `csv` module) read the files back to confirm they're valid CSV.
-- **A bug the check caught.** At first, views grew in step with audience size. Late posts then looked like hits next to early ones, and a normal Twitch stream crossed 2.5× by accident. Views now grow with the square root of audience growth: still realistic, without false breakouts.
-- **Commit the generated CSVs.** They are small (40 KB), and anyone who clones the repo, including CI and the Docker build, has data without running a script. The risk is the CSVs drifting from the script; the README marks them as generated and says to rerun the script instead of editing them.
-- **Plain `.mjs`, not TypeScript.** It's a one-off build tool with no dependencies, so `node scripts/generate-sample-data.mjs` runs as is with no compile step.
+- Deterministic output. `Math.random()` can't be seeded, so the script uses mulberry32, a tiny seeded generator, plus a fixed end date (2026-09-30) instead of "today". Every run writes byte-identical files. I confirmed this by running the script twice and comparing checksums. Tests and screenshots built on this data won't drift. The cost is that the sample data never looks "current", which is fine because the app counts windows back from the newest date in the data.
+- Data designed to test the insight rules. Normal posts are capped at 1.8× usual views, and breakouts sit well above the 2.5× line. Spotify has only one release in the last 30 days, which exercises the "skip platforms with fewer than 3 items" rule. Titles include commas and quotes (`Cold Coffee, Warm Hands`, `Fan duet: "Glass Houses", acoustic`) to exercise CSV quoting. A different parser (Python's `csv` module) read the files back to confirm they're valid CSV.
+- A bug the check caught. At first, views grew in step with audience size. Late posts then looked like hits next to early ones, and a normal Twitch stream crossed 2.5× by accident. Views now grow with the square root of audience growth: still realistic, without false breakouts.
+- Commit the generated CSVs. They are small (40 KB), and anyone who clones the repo, including CI and the Docker build, has data without running a script. The risk is the CSVs drifting from the script; the README marks them as generated and says to rerun the script instead of editing them.
+- Plain `.mjs`, not TypeScript. It's a one-off build tool with no dependencies, so `node scripts/generate-sample-data.mjs` runs as is with no compile step.
 
 ### Interview questions
 
@@ -85,16 +85,16 @@ Run it with `npm run dev -w api` and open http://localhost:4000/graphql for Apol
 
 ### Key decisions and trade-offs
 
-- **graphql 16, not 17.** `npm view` showed graphql 17 is out, but Apollo Server 5 declares `graphql@^16.11` as a peer dependency. A mismatched peer is how you get two copies of graphql-js and confusing runtime errors, so the API pins 16.14.
-- **TypeScript 7.** It's the current release: the compiler rewritten in Go, about 10× faster. The config uses `module: NodeNext`, which follows Node's real ESM rules. That's why imports say `./csv.js` even in `.ts` files: the import names the file that will exist at runtime.
-- **Data sources only filter by date; insights.ts does the thinking.** The "what is a breakout" logic is written and tested once. The BigQuery version (Phase 6) only needs a `WHERE date >= @since` query. The trade-off is that BigQuery returns more rows than strictly needed, which doesn't matter at a few thousand rows.
-- **One shared "newest date" for both tables.** "The last 30 days" means the same days for growth and for breakouts, even if the newest content is a day older than the newest audience number.
-- **A window of N days holds N dates, including the newest.** `windowStart('2026-09-30', 30)` is `2026-09-01`. It's simple to explain, and the tests lock it in, including leap years.
-- **Hand-written CSV parser instead of a library.** The spec requires handling quoted fields, and writing the parser in about 40 lines (with tests) is a good thing to be able to explain. In a team codebase, I'd probably use `csv-parse`.
-- **Friendly validation.** Real exports will have typos. Platform names are trimmed and lowercased (`" Spotify "` works), and errors list up to 10 problems with line numbers instead of stopping at the first one.
-- **`/healthz` doesn't touch the data.** It's a liveness check. If it queried BigQuery, a slow query could make Cloud Run think the container was dead and restart it.
-- **Introspection stays on in production.** The data is read-only and the schema is the documentation. Apollo turns it off by default when `NODE_ENV=production`.
-- **No codegen yet.** Resolver argument types are written by hand because there are only five queries. With a bigger schema, I'd add GraphQL Code Generator so the TypeScript types come from the schema.
+- graphql 16, not 17. `npm view` showed graphql 17 is out, but Apollo Server 5 declares `graphql@^16.11` as a peer dependency. A mismatched peer is how you get two copies of graphql-js and confusing runtime errors, so the API pins 16.14.
+- TypeScript 7. It's the current release: the compiler rewritten in Go, about 10× faster. The config uses `module: NodeNext`, which follows Node's real ESM rules. That's why imports say `./csv.js` even in `.ts` files: the import names the file that will exist at runtime.
+- Data sources only filter by date; insights.ts does the thinking. The "what is a breakout" logic is written and tested once. The BigQuery version (Phase 6) only needs a `WHERE date >= @since` query. The trade-off is that BigQuery returns more rows than strictly needed, which doesn't matter at a few thousand rows.
+- One shared "newest date" for both tables. "The last 30 days" means the same days for growth and for breakouts, even if the newest content is a day older than the newest audience number.
+- A window of N days holds N dates, including the newest. `windowStart('2026-09-30', 30)` is `2026-09-01`. It's simple to explain, and the tests lock it in, including leap years.
+- Hand-written CSV parser instead of a library. The spec requires handling quoted fields, and writing the parser in about 40 lines (with tests) is a good thing to be able to explain. In a team codebase, I'd probably use `csv-parse`.
+- Friendly validation. Real exports will have typos. Platform names are trimmed and lowercased (`" Spotify "` works), and errors list up to 10 problems with line numbers instead of stopping at the first one.
+- `/healthz` doesn't touch the data. It's a liveness check. If it queried BigQuery, a slow query could make Cloud Run think the container was dead and restart it.
+- Introspection stays on in production. The data is read-only and the schema is the documentation. Apollo turns it off by default when `NODE_ENV=production`.
+- No codegen yet. Resolver argument types are written by hand because there are only five queries. With a bigger schema, I'd add GraphQL Code Generator so the TypeScript types come from the schema.
 
 ### Interview questions
 
@@ -113,25 +113,25 @@ Run it with `npm run dev -w api` and open http://localhost:4000/graphql for Apol
 
 A React 19 + TypeScript dashboard in `web/`, built with Vite 8. `npm run dev` at the root starts the API and the dashboard together (using `concurrently`), and Vite proxies `/graphql` to the API on port 4000.
 
-- **One GraphQL query** (`web/src/graphql/dashboard.ts`) fetches everything the page shows for the chosen window. `TypedDocumentNode` gives the result a TypeScript type, so `data.overview.gained` is checked by the compiler.
-- **Top bar:** app name, plus a 30 / 90 / 180-day picker. It's a real radio group, so it works with the keyboard and screen readers. The choice is kept in the URL (`?days=90`).
-- **Headline:** a sentence written from the data by `lib/summary.ts`. It says "Most of them came from TikTok" only when that platform really brought more than half. Otherwise it says "Spotify brought the most". It also handles drops and no change. A second line gives the combined audience and says someone following on two platforms counts twice.
-- **Growth chart:** a Recharts line chart with a Growth/Total toggle and platform chips that show or hide each line. The tooltip lists every visible platform at the hovered date. A "See these numbers as a table" section gives the same numbers without the chart.
-- **Where your fans are:** thin share bars with the latest audience (in each platform's own word: monthly listeners, subscribers, followers), the share, and the gain.
-- **What broke out:** a ranked list with the multiple ("7.1×"), title, platform, date, and "48,055 views, usually 6,762". Streams say "peak viewers" and releases say "streams".
-- **States:** loading, empty (points to the docs and to `npm run sample-data`), and error (says to run `npm run dev`, with a Try again button). When you switch windows, the old numbers stay on screen, dimmed, until the new ones arrive, so nothing flashes or jumps.
+- One GraphQL query (`web/src/graphql/dashboard.ts`) fetches everything the page shows for the chosen window. `TypedDocumentNode` gives the result a TypeScript type, so `data.overview.gained` is checked by the compiler.
+- Top bar: app name, plus a 30 / 90 / 180-day picker. It's a real radio group, so it works with the keyboard and screen readers. The choice is kept in the URL (`?days=90`).
+- Headline: a sentence written from the data by `lib/summary.ts`. It says "Most of them came from TikTok" only when that platform really brought more than half. Otherwise it says "Spotify brought the most". It also handles drops and no change. A second line gives the combined audience and says someone following on two platforms counts twice.
+- Growth chart: a Recharts line chart with a Growth/Total toggle and platform chips that show or hide each line. The tooltip lists every visible platform at the hovered date. A "See these numbers as a table" section gives the same numbers without the chart.
+- Where your fans are: thin share bars with the latest audience (in each platform's own word: monthly listeners, subscribers, followers), the share, and the gain.
+- What broke out: a ranked list with the multiple ("7.1×"), title, platform, date, and "48,055 views, usually 6,762". Streams say "peak viewers" and releases say "streams".
+- States: loading, empty (points to the docs and to `npm run sample-data`), and error (says to run `npm run dev`, with a Try again button). When you switch windows, the old numbers stay on screen, dimmed, until the new ones arrive, so nothing flashes or jumps.
 
 There are 10 Vitest tests for the headline wording, the number formatting, and the axis ticks. I checked it in headless Chromium at 1280px in light and dark mode and at 390px (phone), with no horizontal scrolling. I also checked hover, toggles, the window switch, keyboard focus, and the error state with the API stopped.
 
 ### Key decisions and trade-offs
 
-- **The palette was checked, not eyeballed.** I ran the spec colors through a colorblind-safety validator. Two needed small nudges: Spotify green `#1F7A5A` → `#0F8A5F` (it read as gray) and Kick gold `#B58A00` → `#A47C00` (below 3:1 contrast on the paper background). The dark theme has its own tuned set, checked against the dark background. Colors are CSS variables. The SVG chart reads them in JS (`useThemeColors`) and re-reads them when the system theme changes.
-- **"Growth" is the default view.** TikTok (21K) and Kick (1.6K) on one "Total" axis makes Kick a flat line. Gain since the start of the window puts every platform on a comparable scale, and it's what an artist actually asks: who grew?
-- **Chips are the legend.** Each chip has the line's color, and colors follow the platform, never its rank, so hiding a line never repaints the others.
-- **I calculate the axis ticks myself.** Recharts rounded the axis down to a full tick, so a −50 dip added an empty band down to −2,000. `lib/ticks.ts` ends the axis at the data and puts ticks at round numbers inside it.
-- **No chart for the share bars.** They're plain HTML `div`s, which are simpler, accessible, and easy to style. The text carries the value, and the bar is marked `aria-hidden`.
-- **Dates are formatted in UTC.** `2026-09-30` means a calendar day. Formatting it in local time would show "Sep 29" to anyone west of London.
-- **One bundle, about 230 KB gzipped.** Code-splitting wouldn't help much, because the page always needs Recharts and Apollo, so I raised Vite's warning limit with a comment explaining why.
+- The palette was checked, not eyeballed. I ran the spec colors through a colorblind-safety validator. Two needed small nudges: Spotify green `#1F7A5A` → `#0F8A5F` (it read as gray) and Kick gold `#B58A00` → `#A47C00` (below 3:1 contrast on the paper background). The dark theme has its own tuned set, checked against the dark background. Colors are CSS variables. The SVG chart reads them in JS (`useThemeColors`) and re-reads them when the system theme changes.
+- "Growth" is the default view. TikTok (21K) and Kick (1.6K) on one "Total" axis makes Kick a flat line. Gain since the start of the window puts every platform on a comparable scale, and it's what an artist actually asks: who grew?
+- Chips are the legend. Each chip has the line's color, and colors follow the platform, never its rank, so hiding a line never repaints the others.
+- I calculate the axis ticks myself. Recharts rounded the axis down to a full tick, so a −50 dip added an empty band down to −2,000. `lib/ticks.ts` ends the axis at the data and puts ticks at round numbers inside it.
+- No chart for the share bars. They're plain HTML `div`s, which are simpler, accessible, and easy to style. The text carries the value, and the bar is marked `aria-hidden`.
+- Dates are formatted in UTC. `2026-09-30` means a calendar day. Formatting it in local time would show "Sep 29" to anyone west of London.
+- One bundle, about 230 KB gzipped. Code-splitting wouldn't help much, because the page always needs Recharts and Apollo, so I raised Vite's warning limit with a comment explaining why.
 
 ### Interview questions
 
@@ -148,28 +148,28 @@ There are 10 Vitest tests for the headline wording, the number formatting, and t
 
 ### What was built
 
-- **`docs/REAL_DATA.md`**: how to get numbers from Spotify for Artists, YouTube Studio, Twitch, Kick, and TikTok into the two CSV files. It also explains why views must be measured over the same period to be comparable.
-- **`data/templates/`**: ready-to-copy `audience.csv` and `content.csv` with example rows, including a quoted title with commas.
-- **`ingest/fan_data.py`**: the adapter for existing Python scripts. It uses only the standard library.
+- `docs/REAL_DATA.md`: how to get numbers from Spotify for Artists, YouTube Studio, Twitch, Kick, and TikTok into the two CSV files. It also explains why views must be measured over the same period to be comparable.
+- `data/templates/`: ready-to-copy `audience.csv` and `content.csv` with example rows, including a quoted title with commas.
+- `ingest/fan_data.py`: the adapter for existing Python scripts. It uses only the standard library.
   - `check_folder("data/real")` lists every problem with its line number.
   - `upsert_audience` and `upsert_content` add or replace rows: audience rows keyed by date and platform, content rows by date, platform, and title. Re-running a daily script updates numbers instead of duplicating them.
   - Command-line equivalents: `check`, `add-audience`, `add-content`.
-- **New commands:**
+- New commands:
   - `npm run dev:real`: the dashboard on `data/real`
   - `npm run check-data -- data/real`: check a folder without starting anything
   - `npm test` now also runs the Python tests
-- **A clear startup error** when the data folder is missing ("Can't find data/real/audience.csv. Copy the templates there...") instead of a raw file-not-found error.
+- A clear startup error when the data folder is missing ("Can't find data/real/audience.csv. Copy the templates there...") instead of a raw file-not-found error.
 
 Tests: 6 Python `unittest` tests, plus 3 new API tests. One of them loads `data/templates` through the real `LocalDataSource`, so if the documented format and the API ever disagree, the build fails.
 
-**Still open:** I didn't have access to Adem's existing analytics scripts. Once they're in the repo, or I know what they output, the next step is a small script that calls `upsert_audience` and `upsert_content` with their output.
+Still open: hooking up my existing analytics scripts. The next step is a small script that passes their output to `upsert_audience` and `upsert_content`.
 
 ### Key decisions and trade-offs
 
-- **A documented CSV format, not one adapter per platform export.** Export formats change without notice, and some platforms (Spotify for Artists, Kick) have no public API for these numbers. One small, strictly checked format that any script or spreadsheet can produce is more durable than five parsers for formats I can't test.
-- **Validation in two languages.** The rules exist in TypeScript (`api/src/rows.ts`) and Python (`ingest/fan_data.py`). That's duplication, but each side is about 30 lines, and the cross-check test above catches drift. The alternative, a JSON Schema shared by both, is more machinery than two files need.
-- **Upsert instead of append.** Scripts get re-run, and an append-only file would double-count. A natural key (date + platform) makes re-runs safe. This idea is called idempotency.
-- **Real data stays local.** `data/real/` was in `.gitignore` from Phase 0, and the docs say so up front.
+- A documented CSV format, not one adapter per platform export. Export formats change without notice, and some platforms (Spotify for Artists, Kick) have no public API for these numbers. One small, strictly checked format that any script or spreadsheet can produce is more durable than five parsers for formats I can't test.
+- Validation in two languages. The rules exist in TypeScript (`api/src/rows.ts`) and Python (`ingest/fan_data.py`). That's duplication, but each side is about 30 lines, and the cross-check test above catches drift. The alternative, a JSON Schema shared by both, is more machinery than two files need.
+- Upsert instead of append. Scripts get re-run, and an append-only file would double-count. A natural key (date + platform) makes re-runs safe. This idea is called idempotency.
+- Real data stays local. `data/real/` was in `.gitignore` from Phase 0, and the docs say so up front.
 
 ### Interview questions
 
@@ -186,10 +186,10 @@ Tests: 6 Python `unittest` tests, plus 3 new API tests. One of them loads `data/
 
 ### What was built
 
-- **`Dockerfile`**: one image that serves the dashboard at `/`, GraphQL at `/graphql`, and `/healthz`, all on port 8080.
-- **`.dockerignore`**: keeps `node_modules`, build output, `.git`, real data, Terraform files, and docs out of the build.
-- **Express serves the built dashboard** (`api/src/app.ts`). Hashed files under `/assets/` are cached for a year; `index.html` is always re-checked. A test covers both headers.
-- **New commands:** `npm run docker:build` (builds for `linux/amd64`, which Cloud Run needs) and `npm run docker:run`.
+- `Dockerfile`: one image that serves the dashboard at `/`, GraphQL at `/graphql`, and `/healthz`, all on port 8080.
+- `.dockerignore`: keeps `node_modules`, build output, `.git`, real data, Terraform files, and docs out of the build.
+- Express serves the built dashboard (`api/src/app.ts`). Hashed files under `/assets/` are cached for a year; `index.html` is always re-checked. A test covers both headers.
+- New commands: `npm run docker:build` (builds for `linux/amd64`, which Cloud Run needs) and `npm run docker:run`.
 
 I verified it with `docker run -p 8080:8080`. The page, `/graphql` (90 days: +11,041), and `/healthz` all respond. The container runs as the `node` user, not root. The final image contains no TypeScript, Vite, or test tools. It's 84 MB compressed.
 
@@ -202,10 +202,10 @@ I verified it with `docker run -p 8080:8080`. The page, `/graphql` (90 days: +11
 
 ### Key decisions and trade-offs
 
-- **`node:22-bookworm-slim`, not Alpine or distroless.** Slim is Debian with glibc, so native modules behave exactly as on a normal Linux box. Alpine's musl libc occasionally breaks native packages, and distroless images are smaller but have no shell, which makes debugging harder while you're learning. Slim is the boring middle ground.
-- **Sample data inside the image.** `docker run` works with no configuration. On Cloud Run, `DATA_SOURCE=bigquery` is set and the files are ignored.
-- **No `HEALTHCHECK` in the Dockerfile.** Cloud Run ignores it and uses its own probes. `/healthz` is there for them.
-- **A sandbox-only detail:** this build environment reaches npm through a proxy, so I verified the build with a temporary copy of the Dockerfile that passed proxy settings to `npm ci`. The committed Dockerfile has none of that and builds normally on a Mac or in CI.
+- `node:22-bookworm-slim`, not Alpine or distroless. Slim is Debian with glibc, so native modules behave exactly as on a normal Linux box. Alpine's musl libc occasionally breaks native packages, and distroless images are smaller but have no shell, which makes debugging harder while you're learning. Slim is the boring middle ground.
+- Sample data inside the image. `docker run` works with no configuration. On Cloud Run, `DATA_SOURCE=bigquery` is set and the files are ignored.
+- No `HEALTHCHECK` in the Dockerfile. Cloud Run ignores it and uses its own probes. `/healthz` is there for them.
+- The environment I first built the image in reached npm through a proxy, so I verified it with a temporary Dockerfile that passed proxy settings to `npm ci`. The committed Dockerfile has none of that and builds normally on a Mac or in CI.
 
 ### Interview questions
 
@@ -222,32 +222,32 @@ I verified it with `docker run -p 8080:8080`. The page, `/graphql` (90 days: +11
 
 ### What was built
 
-- **`api/src/bigquery-datasource.ts`**: the second `DataSource`. Each method is one SQL query with a typed `DATE` parameter (`WHERE date >= @since`). `FORMAT_DATE('%F', ...)` returns dates as `YYYY-MM-DD` strings, the same shape the CSV source returns. Table names can't be query parameters, so the project and dataset names are checked against a strict pattern before they go into the SQL.
-- **`api/src/cached-datasource.ts`**: wraps any data source and remembers answers for 5 minutes. It caches the *promise*, so the four simultaneous "newest date" lookups in one page load become one query. Failures are never cached.
-- **`DATA_SOURCE=bigquery`** in `config.ts`, configured with `BQ_PROJECT`, `BQ_DATASET`, `BQ_LOCATION`, `SAMPLE_DATA`, and `CACHE_SECONDS`.
-- **`infra/` (Terraform)**:
+- `api/src/bigquery-datasource.ts`: the second `DataSource`. Each method is one SQL query with a typed `DATE` parameter (`WHERE date >= @since`). `FORMAT_DATE('%F', ...)` returns dates as `YYYY-MM-DD` strings, the same shape the CSV source returns. Table names can't be query parameters, so the project and dataset names are checked against a strict pattern before they go into the SQL.
+- `api/src/cached-datasource.ts`: wraps any data source and remembers answers for 5 minutes. It caches the *promise*, so the four simultaneous "newest date" lookups in one page load become one query. Failures are never cached.
+- `DATA_SOURCE=bigquery` in `config.ts`, configured with `BQ_PROJECT`, `BQ_DATASET`, `BQ_LOCATION`, `SAMPLE_DATA`, and `CACHE_SECONDS`.
+- `infra/` (Terraform):
   - the APIs the project needs
   - an Artifact Registry repository, with a cleanup policy that keeps the 5 newest images
   - the `fan_insights` dataset with `audience` and `content` tables (same columns as the CSVs)
   - a `fan-insights-run` service account that has only `bigquery.dataViewer` on the dataset and `bigquery.jobUser` on the project
   - a Cloud Run v2 service (scale to 0, at most 2 instances, CPU only during requests, `/healthz` startup probe) with public access
-- **`ingest/load_to_bigquery.py`**: checks the files with the Phase 4 rules, normalizes them, and loads each table with `WRITE_TRUNCATE`.
-- **`scripts/deploy.sh`**: Terraform init → create the APIs and registry → build and push the `linux/amd64` image tagged with the git commit → apply everything else → print the URL.
-- **`docs/DEPLOY.md`**: the one-time setup (tools, project, billing, a $5 budget alert, login), the deploy, loading data, updating, tearing down, a Terraform primer (plan, apply, state), and a troubleshooting table.
+- `ingest/load_to_bigquery.py`: checks the files with the Phase 4 rules, normalizes them, and loads each table with `WRITE_TRUNCATE`.
+- `scripts/deploy.sh`: Terraform init → create the APIs and registry → build and push the `linux/amd64` image tagged with the git commit → apply everything else → print the URL.
+- `docs/DEPLOY.md`: the one-time setup (tools, project, billing, a $5 budget alert, login), the deploy, loading data, updating, tearing down, a Terraform primer (plan, apply, state), and a troubleshooting table.
 
 There are 8 new API tests (the BigQuery source tested with a fake query runner, plus the cache) and 1 new Python test for the loader's preparation step.
 
-**Not done here, on purpose:** nothing was created in Google Cloud. That needs Adem's account and billing, and the project rules say to ask before anything that could cost money. This sandbox also can't reach the Terraform registry, so `terraform validate` couldn't run here. CI (Phase 7) runs `terraform fmt -check` and `terraform validate` on GitHub instead.
+Nothing was created in Google Cloud in this phase. That waited until I had set up the project, billing, and a budget alert myself. `terraform validate` couldn't run where the code was written (no access to the Terraform registry), so CI in Phase 7 runs `terraform fmt -check` and `terraform validate` on GitHub instead.
 
 ### Key decisions and trade-offs
 
-- **Least privilege.** The app's identity can read one dataset and run queries. It can't write data, see other datasets, or touch other services. It isn't the default compute service account, which has Editor on the whole project.
-- **Replace instead of append when loading.** `WRITE_TRUNCATE` makes every load idempotent: the tables always equal the files. It re-uploads everything, which costs nothing at this size. At millions of rows, I'd load into a staging table and `MERGE` on (date, platform).
-- **A 5-minute cache in the API.** The data changes at most daily. Caching cuts BigQuery queries per page view from about 8 to at most 1 per distinct question, and makes the page fast after the first view. The trade-off is that a fresh load can take up to 5 minutes to show.
-- **Scale to zero.** It's free while idle. The cost is a cold start of a second or two for the first visitor after a quiet period. `min_instance_count = 1` would remove that for about $10 a month.
-- **Local Terraform state.** Simple for one person, and the file is git-ignored. A team would use a GCS backend with locking.
-- **Deploy order with `-target`.** The registry must exist before the image can be pushed, and Cloud Run needs the image. A `precondition` on the Cloud Run service gives a clear error if someone applies without an image.
-- **Public access (`allUsers` as invoker).** It's a portfolio demo of read-only, non-sensitive data. For private data, I'd put it behind Identity-Aware Proxy instead.
+- Least privilege. The app's identity can read one dataset and run queries. It can't write data, see other datasets, or touch other services. It isn't the default compute service account, which has Editor on the whole project.
+- Replace instead of append when loading. `WRITE_TRUNCATE` makes every load idempotent: the tables always equal the files. It re-uploads everything, which costs nothing at this size. At millions of rows, I'd load into a staging table and `MERGE` on (date, platform).
+- A 5-minute cache in the API. The data changes at most daily. Caching cuts BigQuery queries per page view from about 8 to at most 1 per distinct question, and makes the page fast after the first view. The trade-off is that a fresh load can take up to 5 minutes to show.
+- Scale to zero. It's free while idle. The cost is a cold start of a second or two for the first visitor after a quiet period. `min_instance_count = 1` would remove that for about $10 a month.
+- Local Terraform state. Simple for one person, and the file is git-ignored. A team would use a GCS backend with locking.
+- Deploy order with `-target`. The registry must exist before the image can be pushed, and Cloud Run needs the image. A `precondition` on the Cloud Run service gives a clear error if someone applies without an image.
+- Public access (`allUsers` as invoker). It's a portfolio demo of read-only, non-sensitive data. For private data, I'd put it behind Identity-Aware Proxy instead.
 
 ### Interview questions
 
@@ -269,17 +269,17 @@ There are 8 new API tests (the BigQuery source tested with a fake query runner, 
 | Job | What it checks |
 |---|---|
 | **Typecheck, test, build** | `npm ci` (fails if `package.json` and the lockfile disagree), `npm run typecheck`, `npm test` (Vitest for api/ and web/, plus the Python `unittest` suite), `npm run build` |
-| **Terraform format and validate** | `terraform fmt -check`, then `terraform init -backend=false` and `terraform validate`. This sandbox couldn't reach the Terraform registry, so these checks run for the first time here |
+| **Terraform format and validate** | `terraform fmt -check`, then `terraform init -backend=false` and `terraform validate`. These are the first place the Terraform checks ran |
 | **Docker image builds** | `docker build --platform linux/amd64`, so the Dockerfile can't silently break. Nothing is pushed |
 
 Before committing, I ran the app job's commands in a fresh clone of the branch. That catches anything that only works because of leftover local files, such as a git-ignored file the build quietly depends on.
 
 ### Key decisions and trade-offs
 
-- **CI checks, it doesn't deploy.** Deploying from CI would mean storing Google Cloud credentials in GitHub, ideally through Workload Identity Federation so no long-lived key exists. That's a good next step, but deploys stay a deliberate `scripts/deploy.sh` for now, while billing is new.
-- **Read-only token and cancel-on-push.** `permissions: contents: read` gives the workflow's token the minimum it needs. `concurrency` cancels a run when a newer commit arrives on the same branch.
-- **`node-version-file: .nvmrc`** keeps CI on the same Node version as local development, from one source of truth.
-- **The Docker job costs about a minute per push.** That's worth it, because the Dockerfile is otherwise only exercised at deploy time, which is the worst moment to find it broken.
+- CI checks, it doesn't deploy. Deploying from CI would mean storing Google Cloud credentials in GitHub, ideally through Workload Identity Federation so no long-lived key exists. That's a good next step, but deploys stay a deliberate `scripts/deploy.sh` for now, while billing is new.
+- Read-only token and cancel-on-push. `permissions: contents: read` gives the workflow's token the minimum it needs. `concurrency` cancels a run when a newer commit arrives on the same branch.
+- `node-version-file: .nvmrc` keeps CI on the same Node version as local development, from one source of truth.
+- The Docker job costs about a minute per push. That's worth it, because the Dockerfile is otherwise only exercised at deploy time, which is the worst moment to find it broken.
 
 ### Interview questions
 
@@ -296,11 +296,11 @@ Before committing, I ran the app job's commands in a fresh clone of the branch. 
 
 ### What was built
 
-- **`README.md`**: what the project is, a screenshot, a Mermaid architecture diagram, the stack, how to run it, a repository tour, and "What I would build next". The live URL appears there once `scripts/deploy.sh` has run.
-- **`docs/screenshot.png` and `docs/screenshot-dark.png`**: taken in headless Chromium from the running app on sample data.
-- **A CI badge** in the README.
+- `README.md`: what the project is, a screenshot, a Mermaid architecture diagram, the stack, how to run it, a repository tour, and "What I would build next". The live URL appears there once `scripts/deploy.sh` has run.
+- `docs/screenshot.png` and `docs/screenshot-dark.png`: taken in headless Chromium from the running app on sample data.
+- A CI badge in the README.
 
-The first CI run on GitHub passed all three jobs, including `terraform fmt -check` and `terraform validate`, which couldn't run in the build sandbox.
+The first CI run on GitHub passed all three jobs, including `terraform fmt -check` and `terraform validate`, which hadn't run anywhere before.
 
 ### The project in 60 seconds
 
@@ -325,13 +325,13 @@ The first CI run on GitHub passed all three jobs, including `terraform fmt -chec
 
 ## Fix: live dashboard empty after loading BigQuery
 
-**Symptom.** After loading the sample CSVs into BigQuery (900 and 212 rows, counts verified), the live site still said "No numbers yet". `dataInfo.newestDate` came back as `2026-09-30`, but `overview` returned all zeros, long after the 5-minute cache had expired.
+Symptom: After loading the sample CSVs into BigQuery (900 and 212 rows, counts verified), the live site still said "No numbers yet". `dataInfo.newestDate` came back as `2026-09-30`, but `overview` returned all zeros, long after the 5-minute cache had expired.
 
-**Cause.** The window queries sent `@since` as a typed `DATE` parameter with a plain string value. `@google-cloud/bigquery` expects a `BigQuery.date()` object for that type and reads its `.value`, so a string became an empty parameter. BigQuery saw `date >= NULL`, which is never true, so every window was empty without any error. The newest-date query has no parameter, which is why it alone worked. The unit tests used a fake query runner, so they never ran the library code that dropped the value.
+Cause: The window queries sent `@since` as a typed `DATE` parameter with a plain string value. `@google-cloud/bigquery` expects a `BigQuery.date()` object for that type and reads its `.value`, so a string became an empty parameter. BigQuery saw `date >= NULL`, which is never true, so every window was empty without any error. The newest-date query has no parameter, which is why it alone worked. The unit tests used a fake query runner, so they never ran the library code that dropped the value.
 
-**Fix.** Send `@since` as a plain string and write `CAST(@since AS DATE)` in the SQL. A new test runs the library's real parameter step and checks the value survives.
+Fix: Send `@since` as a plain string and write `CAST(@since AS DATE)` in the SQL. A new test runs the library's real parameter step and checks the value survives.
 
-**Interview questions**
+### Interview questions
 
 1. *How did you narrow it down?* Two answers from the same request disagreed: the newest date was right, the totals were zero. The only difference between those queries was the date parameter, so I checked what the client library actually sends for it.
 2. *Why did the tests not catch it?* They replaced the BigQuery client with a fake, which is right for testing SQL shape and row mapping but blind to how the library serializes parameters. I added one test at that boundary instead of mocking it away.

@@ -51,6 +51,8 @@ html {
 
 body {
   margin: 0;
+  /* Same-width digits, so numbers stacked in lists and tooltips line up. */
+  font-variant-numeric: tabular-nums;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
@@ -65,6 +67,7 @@ h2 {
   line-height: 1.15;
   margin: 0;
   text-wrap: balance;
+  font-variant-numeric: normal;
 }
 
 p {
@@ -137,7 +140,7 @@ code {
   font-size: 1.125rem;
 }
 
-.brand-artist {
+.brand-sub {
   color: var(--muted);
   font-family: var(--font-body);
   font-weight: 500;
@@ -536,6 +539,11 @@ code {
 .footer p {
   border-top: 1px solid var(--rule);
   padding-top: 16px;
+}
+
+.footer a {
+  color: inherit;
+  text-underline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
