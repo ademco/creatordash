@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -98,10 +98,12 @@ export function GrowthChart({ series, days }: Props) {
             key={id}
             type="button"
             className="chip"
+            // --chip is the platform's color: it fills the key square and the sticker's shadow.
+            style={{ '--chip': `var(--platform-${id})` } as CSSProperties}
             aria-pressed={!hidden.has(id)}
             onClick={() => toggle(id)}
           >
-            <span className="chip-key" style={{ background: `var(--platform-${id})` }} aria-hidden="true" />
+            <span className="chip-key" aria-hidden="true" />
             {platformName(id)}
           </button>
         ))}
@@ -147,7 +149,7 @@ export function GrowthChart({ series, days }: Props) {
                   dataKey={id}
                   name={platformName(id)}
                   stroke={colors.platform[id]}
-                  strokeWidth={2}
+                  strokeWidth={3}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   dot={false}

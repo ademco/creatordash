@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatCompact, formatMultiple, formatShortDate, formatSigned } from './format';
-import { audienceLine, headline } from './summary';
+import { audienceLine, headline, headlineParts } from './summary';
 
 const base = { days: 90, combinedAudience: 56295, gained: 0, topPlatform: null, topPlatformGained: 0 };
 
@@ -30,6 +30,32 @@ describe('headline', () => {
     expect(headline({ ...base, gained: 1, topPlatform: 'youtube', topPlatformGained: 1 })).toBe(
       'You picked up 1 fan in the last 90 days. Most of them came from YouTube (+1).',
     );
+  });
+});
+
+describe('headlineParts', () => {
+  it('splits the sentence around the number the page counts up', () => {
+    expect(headlineParts({ ...base, gained: 11041, topPlatform: 'spotify', topPlatformGained: 4755 })).toEqual({
+      before: 'You picked up ',
+      count: 11041,
+      after: ' fans in the last 90 days. Spotify brought the most (+4,755).',
+    });
+  });
+
+  it('counts a drop as a positive number, because the words say "down"', () => {
+    expect(headlineParts({ ...base, gained: -120 })).toEqual({
+      before: 'Your audience is down ',
+      count: 120,
+      after: ' fans in the last 90 days.',
+    });
+  });
+
+  it('has no number when nothing changed', () => {
+    expect(headlineParts(base)).toEqual({
+      before: 'Your audience held steady in the last 90 days.',
+      count: null,
+      after: '',
+    });
   });
 });
 

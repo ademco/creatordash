@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 import { formatNumber, formatShare, formatSigned } from '../lib/format';
 import { audienceWord, platformName } from '../lib/platforms';
 
@@ -18,8 +20,9 @@ export function PlatformShares({ shares, days }: { shares: Share[]; days: number
       <h2 id="shares-title">Where your fans are</h2>
       <p className="section-note">Audience today, and the change over {days} days.</p>
       <ul className="shares">
-        {shares.map(({ platform, audience, share, gained }) => (
-          <li key={platform} className="share">
+        {shares.map(({ platform, audience, share, gained }, index) => (
+          // --i staggers the grow-in animation: each bar starts a beat after the one above.
+          <li key={platform} className="share" style={{ '--i': index } as CSSProperties}>
             <div className="share-label">
               <span>
                 <span className="share-name">{platformName(platform)}</span>{' '}
