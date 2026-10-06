@@ -6,15 +6,21 @@ I make music and stream as Regiwock. My audience is split across Spotify, YouTub
 
 **Live:** [fan-insights-gsv5wgokya-uc.a.run.app](https://fan-insights-gsv5wgokya-uc.a.run.app/?days=90). It runs on sample data: the numbers are made up, the pipeline is real. The first load can take a second or two because the service scales to zero.
 
-![Dashboard showing a one-sentence summary, a growth chart per platform, audience share bars, and a list of posts that broke out](docs/screenshot.png)
+![Dashboard showing a one-sentence summary, a scrubbable waveform of daily fan gains, audience share bars, breakouts on gauges, and a news ticker](docs/screenshot.png)
 
 [Dark mode](docs/screenshot-dark.png) follows your system setting.
 
 ## What it shows
 
-The headline is a sentence written from the data, like "You picked up 11,041 fans in the last 90 days. Spotify brought the most (+4,755)." Under it: a growth chart with one line per platform, where each platform's audience is, and which posts broke out.
+The headline is a sentence written from the data, like "You picked up 11,041 fans in the last 90 days. Spotify brought the most (+4,755)." Under it:
+
+- **A waveform of your growth.** Every day is a bar: fans gained stack up from a center line in each platform's color, fans lost stack down. Move across it (hover, drag, or arrow keys) or press play to sweep through the window. Breakouts are pinned to their dates like comments on a SoundCloud track. The older line charts are one click away.
+- **Where your fans are** and **what broke out**, with each breakout shown on a little gauge.
+- **Around the web.** A ticker and a panel of fresh headlines from music and creator news sites, tagged by platform. Only the headline and a link are kept; the story stays with the publisher.
 
 A post "broke out" if it got at least 2.5× the median views for its platform in that window. I use the median rather than the mean because a big hit inflates the mean and can hide itself, or the next hit. Platforms with fewer than three posts are skipped, since a median of two isn't worth much.
+
+The news comes from RSS feeds the API reads itself (the list is in `api/src/news-feeds.ts`) and caches for 30 minutes. If a feed is down it is skipped; if all are down the news just doesn't show and the numbers load as usual. Set `NEWS_SOURCE=fixture` to use clearly-labeled placeholder headlines with no internet.
 
 Windows (30, 90, 180 days) count back from the newest date in the data, not from today, so an old export still shows a full picture.
 

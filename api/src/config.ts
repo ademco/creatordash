@@ -5,9 +5,31 @@ import { BigQueryDataSource, bigQueryRunner } from './bigquery-datasource.js';
 import { CachedDataSource } from './cached-datasource.js';
 import type { DataSource } from './datasource.js';
 import { LocalDataSource } from './local-datasource.js';
+import { NEWS_FEEDS } from './news-feeds.js';
+import { CachedNewsSource, FeedNewsSource, FixtureNewsSource, type NewsSource } from './news-source.js';
 
 // api/src and api/dist are both two levels below the repo root.
 export const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/** Placeholder headlines for offline development, tests, and CI. */
+export const NEWS_FIXTURE = resolve(REPO_ROOT, 'data/world/news-fallback.json');
+
+/**
+ * Picks where headlines come from:
+ *   NEWS_SOURCE=live (default)  the feeds in news-feeds.ts, cached for
+ *                               NEWS_CACHE_SECONDS (default 1800); if a refresh
+ *                               fails, the last good list is kept for 6 hours
+ *   NEWS_SOURCE=fixture         offline placeholder headlines (no internet needed)
+ */
+export function createNewsSource(env: NodeJS.ProcessEnv): NewsSource {
+  const kind = env.NEWS_SOURCE ?? 'live';
+  if (kind === 'fixture') return new FixtureNewsSource(NEWS_FIXTURE);
+  if (kind === 'live') {
+    const ttlMs = Number(env.NEWS_CACHE_SECONDS ?? 1800) * 1000;
+    return new CachedNewsSource(new FeedNewsSource(NEWS_FEEDS), ttlMs, 6 * 60 * 60 * 1000);
+  }
+  throw new Error(`Unknown NEWS_SOURCE "${kind}". Use "live" or "fixture".`);
+}
 
 /**
  * Picks the data source from environment variables:

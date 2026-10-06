@@ -407,3 +407,37 @@ Checks: typecheck clean, 97 tests pass (38 web, 59 API), build green. Bundle gre
 
 3. **Why custom SVG instead of a chart library?**
    The library gives lines and plain bars, not a mirrored stacked waveform with a playhead and pins. Drawing it myself took about 100 lines, and the geometry is pure functions I could unit test, such as "gains go above the center line" and "one scale for both halves".
+
+## Phase 11: Around the web
+
+### What was built
+
+The dashboard now pulls in live music and creator-economy headlines.
+
+- **A ticker** under the top bar and an **"Around the web" panel** at the bottom. Headlines are tagged by platform (a TikTok story gets TikTok's color), and stories about the platforms the artist is on come first.
+- **The API reads the feeds, not the browser.** `news.ts` parses RSS and Atom into `{title, url, source, publishedAt, platform}` and keeps only that: the story itself stays with the publisher. `news-source.ts` fetches all feeds at once with a 3 second timeout and a 1 MB cap each. `news-feeds.ts` is the fixed list of feeds.
+- **A new `news(limit)` GraphQL query**, with the schema descriptions like the rest. It is a separate query on the page, so slow or missing news can never delay the numbers.
+- **A shared cache.** The promise cache from `CachedDataSource` moved into `ttl-cache.ts` and now serves both. News is cached 30 minutes, and if a refresh fails the last good list is kept for up to 6 hours.
+- **An offline fixture** (`data/world/news-fallback.json`, used with `NEWS_SOURCE=fixture`, in tests, and in CI). Its headlines start with "Sample headline:" and the result says `live: false`, so the page labels them "Offline sample" and fake text is never passed off as news.
+
+Checks: typecheck clean; 93 API tests, 44 web tests, and 7 Python tests pass; build green. Bundle grew about 1.7 kB gzipped. One new dependency: `fast-xml-parser`. In the browser I checked the ticker pauses on hover, on keyboard focus, and with its button; it disappears into a plain row with reduced motion; links open safely in a new tab; the phone layout has no sideways overflow. With every feed unreachable (as in this sandbox), the news query answers in 0.3 s with an empty list, the ticker and panel do not appear, and the dashboard loads as normal with no errors.
+
+### Key decisions and trade-offs
+
+- **News is a "right now" layer, not a timeline overlay.** RSS feeds only hold the last week or two, while the sample numbers end on 2026-09-30, so the headlines cannot be lined up against the waveform. The page says so plainly: real headlines next to made-up numbers.
+- **The feed list is fixed in code, never from a visitor.** The server only fetches addresses we wrote, so the API cannot be used to make it fetch something else (SSRF). There is no `NEWS_FEEDS` setting on purpose.
+- **Hostile feeds are expected.** Entity expansion is off in the parser and decoding is done by a small function with a short allow-list (so an entity bomb cannot grow); titles are cut to 200 characters; only http/https links survive (checked in the API and again on the page); feeds over 1 MB are refused mid-download; items without a date or a web link are dropped.
+- **Dead feeds are normal.** `Promise.allSettled` means one broken feed costs only its own headlines. If all fail, the API throws inside the cache layer (so an empty list is never cached) and the resolver turns that into an empty list.
+- **Known gap:** while every feed is down, each news request retries them (failures are not cached). That only delays the news query, never the dashboard, but a negative cache of a minute or two would be kinder to the news sites.
+- **Not verified here:** this sandbox's network blocks every news site, so the five feed addresses in `news-feeds.ts` have only been tested against fake responses, not the real sites. If one has moved it is skipped and the others still work, but it should be checked once against the live internet (the deployed service or a laptop).
+
+### Interview questions
+
+1. **Why does the API fetch the feeds instead of the browser?**
+   Browsers block cross-site feed requests (CORS), and most news sites do not allow them. Fetching on the server also lets one cached copy serve every visitor, so we hit each site about twice an hour instead of once per page view, and the server can limit time, size, and content before anything reaches the page.
+
+2. **What can go wrong when you fetch URLs from the internet, and how did you guard against it?**
+   Slow or huge responses (3 second timeout, 1 MB cap while streaming), malicious XML (entity expansion off, text cleaned by a tiny decoder), dangerous links like `javascript:` (only http/https kept, checked twice), and server-side request forgery (the addresses are a fixed list in code, never user input). Each of those is a unit test.
+
+3. **How do you make a feature that depends on third parties not hurt the rest of the app?**
+   Separate query on the page, so the dashboard never waits for it; each feed fetched independently with a timeout; a cache that keeps the last good answer when a refresh fails; and a resolver that returns an empty list instead of an error. I tested the worst case, all feeds down, and the numbers still load in under a second.

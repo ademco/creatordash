@@ -11,10 +11,12 @@ import {
   platformBreakdown,
   windowStart,
 } from './insights.js';
+import type { NewsSource } from './news-source.js';
 import type { AudienceRow, ContentRow } from './types.js';
 
 export interface Context {
   dataSource: DataSource;
+  news: NewsSource;
 }
 
 interface DaysArgs {
@@ -54,5 +56,17 @@ export const resolvers = {
     },
 
     dataInfo: (_parent: unknown, _args: unknown, { dataSource }: Context) => dataSource.info(),
+
+    // News is a nice extra, so it must never take the dashboard down: if the
+    // feeds are unreachable the answer is an empty list, not an error.
+    news: async (_parent: unknown, args: { limit: number }, { news }: Context) => {
+      const limit = Math.min(30, Math.max(1, Math.trunc(Number.isFinite(args.limit) ? args.limit : 12)));
+      try {
+        return await news.latest(limit);
+      } catch (error) {
+        console.warn('News unavailable:', error instanceof Error ? error.message : error);
+        return { live: true, items: [] };
+      }
+    },
   },
 };

@@ -40,6 +40,9 @@ COPY --from=build-web /app/web/dist web/dist
 # Sample data, so the image works on its own (DATA_SOURCE=local, the default).
 # On Cloud Run DATA_SOURCE=bigquery is set and these files are not used.
 COPY data/sample data/sample
+# Placeholder headlines, used only when NEWS_SOURCE=fixture. The default (live)
+# reads the real news feeds over the internet instead.
+COPY data/world data/world
 # Don't run as root: if the app were ever compromised, the attacker would
 # only have the rights of this unprivileged user.
 USER node
