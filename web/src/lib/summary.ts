@@ -42,7 +42,7 @@ export function headline(o: OverviewNumbers): string {
 export function audienceLine(o: Pick<OverviewNumbers, 'combinedAudience'>, platformCount: number): string {
   const where = `across ${platformCount} ${platformCount === 1 ? 'platform' : 'platforms'}`;
   return (
-    `${formatNumber(o.combinedAudience)} followers, subscribers, and monthly listeners ${where} today. ` +
+    `${formatNumber(o.combinedAudience)} fans ${where} today. ` +
     'Someone who follows you in two places counts twice.'
   );
 }

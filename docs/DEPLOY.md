@@ -69,7 +69,7 @@ It prints the URL at the end. The first deploy takes a few minutes, mostly enabl
 python3 ingest/load_to_bigquery.py --project YOUR_PROJECT_ID --data data/sample
 ```
 
-No working Python? This does the same with only `gcloud` and `bq`, then counts the rows and waits until the live page shows the numbers:
+No working Python? This does the same with only `gcloud`, `bq`, and Node: it checks and cleans the files, loads them, counts the rows, and waits until the live page shows the numbers:
 
 ```bash
 npm run load-bq -- YOUR_PROJECT_ID              # sample data
