@@ -1,0 +1,58 @@
+[
+  {
+    "title": "Sample headline: a streaming service changes how it pays artists",
+    "url": "https://example.com/sample-headline-1",
+    "source": "Sample feed",
+    "hoursAgo": 2,
+    "platform": "spotify"
+  },
+  {
+    "title": "Sample headline: short-form video app tests longer clips",
+    "url": "https://example.com/sample-headline-2",
+    "source": "Sample feed",
+    "hoursAgo": 5,
+    "platform": "tiktok"
+  },
+  {
+    "title": "Sample headline: independent labels report a strong quarter",
+    "url": "https://example.com/sample-headline-3",
+    "source": "Sample feed",
+    "hoursAgo": 9,
+    "platform": null
+  },
+  {
+    "title": "Sample headline: live-streaming site updates its creator payout rules",
+    "url": "https://example.com/sample-headline-4",
+    "source": "Sample feed",
+    "hoursAgo": 14,
+    "platform": "twitch"
+  },
+  {
+    "title": "Sample headline: video platform adds new tools for music creators",
+    "url": "https://example.com/sample-headline-5",
+    "source": "Sample feed",
+    "hoursAgo": 20,
+    "platform": "youtube"
+  },
+  {
+    "title": "Sample headline: a newer streaming rival courts big names",
+    "url": "https://example.com/sample-headline-6",
+    "source": "Sample feed",
+    "hoursAgo": 30,
+    "platform": "kick"
+  },
+  {
+    "title": "Sample headline: festival season lineups start to leak",
+    "url": "https://example.com/sample-headline-7",
+    "source": "Sample feed",
+    "hoursAgo": 41,
+    "platform": null
+  },
+  {
+    "title": "Sample headline: playlist editors on what makes a track stick",
+    "url": "https://example.com/sample-headline-8",
+    "source": "Sample feed",
+    "hoursAgo": 55,
+    "platform": "spotify"
+  }
+]

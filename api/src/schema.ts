@@ -74,6 +74,29 @@ export const typeDefs = /* GraphQL */ `
     newestDate: String
   }
 
+  """
+  A headline from a music or creator-economy news site. Only the headline, the
+  site, the date, and the link are kept: the story itself stays with the publisher.
+  """
+  type NewsItem {
+    title: String!
+    "Link to the story on the publisher's site (always http or https)."
+    url: String!
+    "The site it came from, e.g. Music Business Worldwide."
+    source: String!
+    "When it was published, ISO 8601."
+    publishedAt: String!
+    "spotify, youtube, twitch, kick, or tiktok when the headline is about one of them; otherwise null."
+    platform: String
+  }
+
+  "Recent headlines, newest first."
+  type News {
+    "False for the built-in offline sample headlines (they are placeholders, not real news)."
+    live: Boolean!
+    items: [NewsItem!]!
+  }
+
   type Query {
     "Headline numbers: combined audience, total gained, and the fastest-growing platform."
     overview("Window length in days, clamped to 1..365." days: Int = 30): Overview!
@@ -97,5 +120,11 @@ export const typeDefs = /* GraphQL */ `
 
     "Where the numbers come from, and whether they are sample data."
     dataInfo: DataInfo!
+
+    """
+    Recent music and creator-economy headlines, cached for about 30 minutes. If the news
+    sites cannot be reached the list is empty; this never fails the rest of the dashboard.
+    """
+    news("How many headlines, from 1 to 30." limit: Int = 12): News!
   }
 `;

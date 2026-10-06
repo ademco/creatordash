@@ -2,9 +2,11 @@ import { useQuery } from '@apollo/client/react';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { flushSync } from 'react-dom';
 
+import { AroundTheWeb } from './components/AroundTheWeb';
 import { BreakoutList } from './components/BreakoutList';
 import { GrowthChart } from './components/GrowthChart';
 import { Headline } from './components/Headline';
+import { NewsTicker } from './components/NewsTicker';
 import { PlatformShares } from './components/PlatformShares';
 import { EmptyState, ErrorState, LoadingState } from './components/States';
 import { TopBar, WINDOW_OPTIONS } from './components/TopBar';
@@ -86,6 +88,7 @@ export function App() {
             <BreakoutList breakouts={breakouts} days={overview.days} />
           </div>
         </div>
+        <AroundTheWeb sample={shown.dataInfo.sample} />
       </div>
     );
   }
@@ -93,6 +96,7 @@ export function App() {
   return (
     <>
       <TopBar days={days} onDaysChange={setDays} />
+      <NewsTicker />
       <main id="main">{body}</main>
       <footer className="band-footer">
         <div className="page footer">

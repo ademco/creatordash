@@ -115,3 +115,44 @@ describe('serving the built dashboard', () => {
     }
   });
 });
+
+describe('the news query', () => {
+  it('returns the offline sample headlines by default, labeled as not live', async () => {
+    const { news } = await graphql('{ news { live items { title url source publishedAt platform } } }');
+    expect(news.live).toBe(false);
+    expect(news.items).toHaveLength(8);
+    expect(news.items[0]).toMatchObject({ source: 'Sample feed', platform: 'spotify' });
+    expect(news.items[0].url).toMatch(/^https:\/\//);
+  });
+
+  it('respects limit and clamps it to 1..30', async () => {
+    expect((await graphql('{ news(limit: 3) { items { title } } }')).news.items).toHaveLength(3);
+    expect((await graphql('{ news(limit: 0) { items { title } } }')).news.items).toHaveLength(1);
+    expect((await graphql('{ news(limit: 999) { items { title } } }')).news.items).toHaveLength(8);
+  });
+
+  it('never breaks the dashboard when the news source fails', async () => {
+    const broken = {
+      latest: async () => {
+        throw new Error('no news feed answered');
+      },
+    };
+    const app = await createApp(createDataSource({ DATA_DIR: 'data/sample' }), { news: broken });
+    const brokenServer = app.listen(0);
+    await new Promise((resolve) => brokenServer.once('listening', resolve));
+    const url = `http://localhost:${(brokenServer.address() as AddressInfo).port}/graphql`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '{ news { live items { title } } overview(days: 30) { gained } }' }),
+      });
+      const body = (await response.json()) as { data: any; errors?: unknown };
+      expect(body.errors).toBeUndefined();
+      expect(body.data.news).toEqual({ live: true, items: [] });
+      expect(body.data.overview.gained).toBe(3414);
+    } finally {
+      brokenServer.close();
+    }
+  });
+});

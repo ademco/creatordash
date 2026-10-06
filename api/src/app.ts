@@ -5,13 +5,17 @@ import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@as-integrations/express5';
 import express from 'express';
 
+import { NEWS_FIXTURE } from './config.js';
 import type { DataSource } from './datasource.js';
+import { FixtureNewsSource, type NewsSource } from './news-source.js';
 import { resolvers, type Context } from './resolvers.js';
 import { typeDefs } from './schema.js';
 
 export interface AppOptions {
   /** Folder with the built dashboard (web/dist). When set, the app serves it at /. */
   webDir?: string | undefined;
+  /** Where headlines come from. Defaults to the offline sample headlines, so tests never use the network. */
+  news?: NewsSource | undefined;
 }
 
 /**
@@ -30,6 +34,7 @@ export async function createApp(dataSource: DataSource, options: AppOptions = {}
   });
   await apollo.start();
 
+  const news = options.news ?? new FixtureNewsSource(NEWS_FIXTURE);
   const app = express();
 
   // Cloud Run and Docker call this to check the server is up. It deliberately
@@ -39,7 +44,7 @@ export async function createApp(dataSource: DataSource, options: AppOptions = {}
     res.json({ status: 'ok' });
   });
 
-  app.use('/graphql', express.json(), expressMiddleware(apollo, { context: async () => ({ dataSource }) }));
+  app.use('/graphql', express.json(), expressMiddleware(apollo, { context: async () => ({ dataSource, news }) }));
 
   // One container serves the page and the API from the same origin, so the
   // browser needs no CORS rules (in development, Vite's proxy does the same job).
