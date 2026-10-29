@@ -29,7 +29,7 @@ concurrency:
 
 env:
   PROJECT_ID: creator-insights-510722
-  PROJECT_NUMBER: "REPLACE_WITH_PROJECT_NUMBER"
+  PROJECT_NUMBER: "340849159527"
   REGION: us-central1
   SERVICE: fan-insights
   IMAGE_REPO: us-central1-docker.pkg.dev/creator-insights-510722/fan-insights/app
