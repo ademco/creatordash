@@ -72,10 +72,23 @@ if ! gcloud iam workload-identity-pools providers describe "$PROVIDER" \
     --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
     --attribute-condition "assertion.repository == '$REPO' && assertion.ref == 'refs/heads/main'"
 fi
-gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA" \
-  --role roles/iam.workloadIdentityUser \
-  --member "principalSet://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/$POOL/attribute.repository/$REPO" \
-  --quiet >/dev/null
+# A service account created a moment ago can take a minute to be visible to
+# IAM everywhere, and until then this fails with PERMISSION_DENIED "(or it may
+# not exist)". So retry for up to two minutes before giving up.
+for attempt in 1 2 3 4 5 6 7 8; do
+  if gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA" \
+    --role roles/iam.workloadIdentityUser \
+    --member "principalSet://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/$POOL/attribute.repository/$REPO" \
+    --quiet >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "$attempt" == 8 ]]; then
+    echo "Still can't update $DEPLOY_SA. Wait a few minutes and run this script again." >&2
+    exit 1
+  fi
+  echo "    The new service account isn't visible yet; retrying in 15 seconds..."
+  sleep 15
+done
 
 echo
 echo "Done. Send this line to whoever is setting up the workflow:"
