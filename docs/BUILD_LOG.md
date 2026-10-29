@@ -458,6 +458,8 @@ Checks: typecheck clean; 93 API tests, 44 web tests, and 7 Python tests pass; bu
 - Deploy only after CI passes, using `workflow_run` instead of a second copy of the checks. `concurrency` with `cancel-in-progress: false` means two quick merges queue up instead of cancelling a rollout halfway.
 - The smoke test runs on GitHub's servers, which can reach the news sites. That's where the phase 11 feed list gets checked against the real internet for the first time.
 
+The first run logged in, built, pushed, and rolled out on the first try, then the smoke test failed: `/healthz` returned 404. Cloud Run reserves public URL paths ending in `z` for Google's own use, so the request never reached the app. The startup probe still works because it calls the container directly. The smoke test now loads the page (`/`) instead, which is what a visitor does anyway.
+
 ### Interview questions
 
 1. **How does GitHub Actions log in to Google Cloud without a key?**

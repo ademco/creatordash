@@ -24,8 +24,15 @@ json() {
   node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{const d=JSON.parse(s);console.log(eval(process.argv[1]))})' "$1"
 }
 
-echo "==> Health"
-curl -sS -m 30 -f "$URL/healthz" >/dev/null
+# The page itself, not /healthz: Cloud Run reserves public paths ending in "z"
+# and answers them with its own 404, so /healthz only works from inside (the
+# startup probe). Loading the page is what a visitor does anyway.
+echo "==> Page"
+page="$(curl -sS -m 30 -f "$URL/")"
+if [[ "$page" != *'<div id="root">'* ]]; then
+  echo "    $URL/ didn't return the dashboard page." >&2
+  exit 1
+fi
 echo "    ok"
 
 echo "==> Numbers"
