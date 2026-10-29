@@ -65,7 +65,20 @@ Once you load real numbers, turn off the sample-data label:
 SAMPLE_DATA=false scripts/deploy.sh YOUR_PROJECT_ID
 ```
 
-## Updating
+## Deploying from GitHub (automatic)
+
+After a one-time setup, every merge to `main` deploys itself. `.github/workflows/deploy.yml` waits for CI to pass, builds the image, rolls out a new Cloud Run revision, and runs `scripts/smoke-test.sh` against the live site. You can also run it by hand from the repo's Actions tab ("Deploy", then "Run workflow").
+
+There's no key to store. GitHub gives each run a short-lived signed token; Google accepts it only from `ademco/creatordash` on `main` and swaps it for a deploy service account that can push images and roll out revisions, nothing more. To set that up, open [Cloud Shell](https://shell.cloud.google.com) as the project owner and run:
+
+```bash
+git clone https://github.com/ademco/creatordash.git && cd creatordash
+scripts/setup-github-deploy.sh YOUR_PROJECT_ID
+```
+
+It prints the project number, which goes in `PROJECT_NUMBER` at the top of `deploy.yml`. The workflow only swaps the image; env vars, identity, and public access stay in Terraform. So until the next `scripts/deploy.sh`, `terraform plan` shows the image as changed. That's expected.
+
+## Updating by hand
 
 Commit, then run `scripts/deploy.sh YOUR_PROJECT_ID` again. Images are tagged with the git commit, so you can always tell which code is live. A `-dirty` suffix means the image was built with uncommitted changes. The API caches answers for 5 minutes, so new data can take that long to appear.
 
