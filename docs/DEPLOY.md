@@ -106,4 +106,5 @@ The deploy script uses `-target` once, on purpose: Cloud Run needs an image, and
 | "Couldn't load your numbers" | Check Cloud Run → fan-insights → Logs. `Access Denied` means permissions are still propagating; wait a minute. `Not found: Table` means step 6 hasn't run. |
 | "No numbers yet" | The tables are empty. Run step 6. |
 | `exec format error` in the logs | The image was built for ARM. Use the script, which always builds `linux/amd64`. |
+| `/healthz` gives 404 on the public URL | Expected. Cloud Run reserves public paths ending in `z`. The startup probe reaches `/healthz` from inside; from outside, check `/` or `/graphql`. |
 | Can't add `allUsers` | Some Google Workspace organizations block public services. A personal project works. |
