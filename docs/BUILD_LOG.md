@@ -441,3 +441,30 @@ Checks: typecheck clean; 93 API tests, 44 web tests, and 7 Python tests pass; bu
 
 3. **How do you make a feature that depends on third parties not hurt the rest of the app?**
    Separate query on the page, so the dashboard never waits for it; each feed fetched independently with a timeout; a cache that keeps the last good answer when a refresh fails; and a resolver that returns an empty list instead of an error. I tested the worst case, all feeds down, and the numbers still load in under a second.
+
+## Phase 12: Deploy from GitHub Actions
+
+### What was built
+
+- `.github/workflows/deploy.yml` deploys `main` to Cloud Run. It waits for the CI workflow to pass on that commit (`workflow_run`), checks out the exact commit CI tested, builds and pushes the image tagged with its short SHA, and rolls out a new revision with `gcloud run services update --image`. It can also be started by hand from the Actions tab.
+- `scripts/smoke-test.sh URL` checks the live site after every rollout: `/healthz`, then the numbers (it fails if the combined audience is 0), then the news query. It also fetches each feed in `news-feeds.ts` directly and names any that is dead or has moved. News problems are warnings, not failures, because those sites aren't mine.
+- `scripts/setup-github-deploy.sh PROJECT_ID`, run once in Cloud Shell, sets up keyless login: a `github-deployer` service account, a workload identity pool and provider for GitHub's tokens, and four narrow permission grants.
+
+### Key decisions and trade-offs
+
+- No stored key. A JSON service-account key in GitHub secrets would work, but it never expires and works from anywhere if it leaks. With Workload Identity Federation, GitHub signs a token per run, and Google accepts it only when it says `ademco/creatordash` on `refs/heads/main`. A pull request from a fork, or any other branch, can't deploy.
+- Least privilege for the deployer: push to one registry, roll out revisions (`run.developer`, which can't change who may view the service), and act as the app's runtime account only. It can't touch BigQuery or IAM.
+- The workflow swaps the image and nothing else; Terraform still owns the service's configuration. The cost is a known drift: `terraform plan` shows the image as changed until the next `scripts/deploy.sh`. Running Terraform in CI would fix that, but needs remote state first.
+- Deploy only after CI passes, using `workflow_run` instead of a second copy of the checks. `concurrency` with `cancel-in-progress: false` means two quick merges queue up instead of cancelling a rollout halfway.
+- The smoke test runs on GitHub's servers, which can reach the news sites. That's where the phase 11 feed list gets checked against the real internet for the first time.
+
+### Interview questions
+
+1. **How does GitHub Actions log in to Google Cloud without a key?**
+   GitHub is an OpenID Connect provider. Each workflow run can ask for a signed token whose claims say which repo, branch, and workflow it is. I registered GitHub as a trusted issuer in a workload identity pool, with a condition that the repository is mine and the ref is `main`. The auth action trades that token for a short-lived Google access token for the deploy service account. Nothing long-lived exists to steal.
+
+2. **Why deploy from CI at all instead of from your laptop?**
+   Every deploy is then a tested commit from `main`, with a log anyone on the team can read, and it doesn't depend on one person's machine and login. My laptop deploy also tagged images `-dirty` when I had uncommitted changes. CI builds from a clean checkout every time.
+
+3. **What does the smoke test catch that unit tests can't?**
+   Things that only exist in production: the image starting on Cloud Run, the service account actually being able to read BigQuery, the tables having data, and the news sites being reachable from Google's network. The first BigQuery bug in this project passed every unit test and only showed up on the live site, which is exactly the case this check is for.

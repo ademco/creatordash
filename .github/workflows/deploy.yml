@@ -1,0 +1,70 @@
+# Deploys main to Cloud Run after CI passes, then checks the live site.
+#
+# Login is keyless: GitHub gives this run a short-lived signed token, and
+# Google lets only ademco/creatordash on main trade it for the deploy service
+# account. scripts/setup-github-deploy.sh created that trust once.
+#
+# This only swaps the image. Everything else about the service (env vars,
+# identity, public access) stays in Terraform, so `terraform plan` will show
+# the image as changed until the next scripts/deploy.sh. That's expected.
+name: Deploy
+
+on:
+  # Wait for CI on main to finish, and deploy only if it passed.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Or deploy main by hand from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # lets the run ask GitHub for its signed token
+
+# One deploy at a time; a newer one waits instead of cancelling a rollout halfway.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: creator-insights-510722
+  PROJECT_NUMBER: "REPLACE_WITH_PROJECT_NUMBER"
+  REGION: us-central1
+  SERVICE: fan-insights
+  IMAGE_REPO: us-central1-docker.pkg.dev/creator-insights-510722/fan-insights/app
+
+jobs:
+  deploy:
+    name: Build, deploy, smoke test
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      # The exact commit CI tested, not whatever main is by now.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: github-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      # Tagged with the commit, so the running image always traces back to its code.
+      - name: Build and push the image
+        run: |
+          IMAGE="$IMAGE_REPO:$(git rev-parse --short HEAD)"
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker build --platform linux/amd64 -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Roll out the new revision
+        run: gcloud run services update "$SERVICE" --region "$REGION" --image "$IMAGE" --quiet
+
+      - name: Smoke test the live site
+        run: |
+          URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
+          scripts/smoke-test.sh "$URL"

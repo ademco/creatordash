@@ -39,7 +39,7 @@ flowchart LR
 
 The page makes one GraphQL query. The API keeps the rules in `api/src/insights.ts` as pure, tested functions, and reads rows through a small `DataSource` interface: CSV files on my laptop, BigQuery in production. Both return the same shapes, so the rules can't tell them apart.
 
-In production it's a single container on Cloud Run that serves both the API and the built React app. It reads BigQuery as a service account that can see one dataset and nothing else. Everything in Google Cloud is defined in Terraform under `infra/`, and GitHub Actions runs typecheck, tests, build, `terraform validate`, and a Docker build on every push.
+In production it's a single container on Cloud Run that serves both the API and the built React app. It reads BigQuery as a service account that can see one dataset and nothing else. Everything in Google Cloud is defined in Terraform under `infra/`. GitHub Actions runs typecheck, tests, build, `terraform validate`, and a Docker build on every push. When that passes on `main`, a second workflow deploys to Cloud Run and smoke-tests the live site. It logs in to Google with a short-lived token instead of a stored key, and only this repo's `main` branch is allowed to.
 
 Stack: React 19, TypeScript, Vite, Apollo Client and Server, Recharts, Express 5, BigQuery, Terraform, Docker, Cloud Run, Vitest.
 
@@ -73,7 +73,7 @@ After the first deploy the live site showed zeros even though BigQuery had all t
 
 - **Release impact.** For each release, the audience change in the week after versus the week before. It answers "did that drop move anything?" and is a natural window-function query in BigQuery.
 - **Daily refresh.** A scheduled job that pulls from the platforms with APIs (YouTube, Twitch) and merges into BigQuery, so I stop exporting CSVs by hand.
-- **Deploy on merge.** GitHub Actions deploying with Workload Identity Federation instead of stored keys, and Terraform state in a shared bucket.
+- **Terraform in CI.** Deploys already run from GitHub, but Terraform state still lives on my laptop. Moving it to a Cloud Storage bucket would let the workflow apply infrastructure changes too.
 
 ## How I built it
 
